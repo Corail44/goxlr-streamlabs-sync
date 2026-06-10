@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { IS_SEA, ROOT } from './assets.js';
 
@@ -46,6 +47,7 @@ const DEFAULTS = {
     openBrowser: false,
     tray: true,
   },
+  updateCheck: true,
 };
 
 const EXAMPLE_MAPPINGS = [
@@ -60,49 +62,24 @@ export function defaultConfig() {
   return JSON.parse(JSON.stringify(DEFAULTS));
 }
 
-export function loadConfig(explicitPath, { optional = false } = {}) {
-  const candidates = explicitPath
-    ? [path.resolve(explicitPath)]
-    : [path.resolve(process.cwd(), 'config.json'), path.join(ROOT, 'config.json')];
-  let file = candidates.find((p) => fs.existsSync(p));
-  let created = false;
+// Stable per-user folder — survives wherever the exe is launched from
+// (browser temp folders, Downloads, USB sticks...).
+export function appDataDir() {
+  const base = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+  return path.join(base, 'goxlr-streamlabs-sync');
+}
 
-  // Packaged .exe first run: create an editable config next to the executable.
-  if (!file && IS_SEA && !explicitPath) {
-    const target = path.join(ROOT, 'config.json');
-    const initial = defaultConfig();
-    initial.sync.mappings = EXAMPLE_MAPPINGS;
-    try {
-      fs.writeFileSync(target, JSON.stringify(initial, null, 2) + '\n');
-      file = target;
-      created = true;
-    } catch {
-      // read-only folder: fall through to the error below
-    }
-  }
+// Where a new config should be created when none exists.
+export function defaultConfigPath() {
+  return IS_SEA ? path.join(appDataDir(), 'config.json') : path.join(ROOT, 'config.json');
+}
 
-  if (!file) {
-    if (optional) return { cfg: defaultConfig(), file: null, created: false };
-    throw new Error(
-      `No config.json found (looked at: ${candidates.join(' ; ')})\n` +
-        `  -> Copy "${path.join(ROOT, 'config.example.json')}" to "${path.join(ROOT, 'config.json')}" and edit the mappings.`
-    );
-  }
+export function saveConfigFile(file, cfg) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + '\n');
+}
 
-  let raw;
-  try {
-    raw = JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new Error(`Invalid JSON in ${file}: ${e.message}`);
-  }
-
-  const cfg = {
-    goxlr: { ...DEFAULTS.goxlr, ...raw.goxlr },
-    streamlabs: { ...DEFAULTS.streamlabs, ...raw.streamlabs },
-    sync: { ...DEFAULTS.sync, ...raw.sync },
-    ui: { ...DEFAULTS.ui, ...raw.ui },
-  };
-
+export function validateConfig(cfg) {
   const s = cfg.sync;
   if (!Array.isArray(s.mappings)) throw new Error('config: sync.mappings must be an array');
   for (const m of s.mappings) {
@@ -135,6 +112,64 @@ export function loadConfig(explicitPath, { optional = false } = {}) {
   if (typeof cfg.ui.host !== 'string' || !cfg.ui.host.trim()) {
     throw new Error('config: ui.host must be a non-empty string');
   }
+  if (typeof cfg.updateCheck !== 'boolean') {
+    throw new Error('config: updateCheck must be a boolean');
+  }
+}
 
+export function mergeWithDefaults(raw) {
+  return {
+    goxlr: { ...DEFAULTS.goxlr, ...raw.goxlr },
+    streamlabs: { ...DEFAULTS.streamlabs, ...raw.streamlabs },
+    sync: { ...DEFAULTS.sync, ...raw.sync },
+    ui: { ...DEFAULTS.ui, ...raw.ui },
+    updateCheck: typeof raw.updateCheck === 'boolean' ? raw.updateCheck : DEFAULTS.updateCheck,
+  };
+}
+
+// Search order: --config > ./config.json (cwd) > next to the exe / project root
+// > %APPDATA%\goxlr-streamlabs-sync\config.json. The packaged exe creates the
+// APPDATA one on first run.
+export function loadConfig(explicitPath, { optional = false } = {}) {
+  const candidates = explicitPath
+    ? [path.resolve(explicitPath)]
+    : [
+        path.resolve(process.cwd(), 'config.json'),
+        path.join(ROOT, 'config.json'),
+        path.join(appDataDir(), 'config.json'),
+      ];
+  let file = candidates.find((p) => fs.existsSync(p));
+  let created = false;
+
+  if (!file && IS_SEA && !explicitPath) {
+    const target = defaultConfigPath();
+    const initial = defaultConfig();
+    initial.sync.mappings = EXAMPLE_MAPPINGS;
+    try {
+      saveConfigFile(target, initial);
+      file = target;
+      created = true;
+    } catch {
+      // unwritable: fall through to the error below
+    }
+  }
+
+  if (!file) {
+    if (optional) return { cfg: defaultConfig(), file: null, created: false };
+    throw new Error(
+      `No config.json found (looked at: ${candidates.join(' ; ')})\n` +
+        `  -> Copy "${path.join(ROOT, 'config.example.json')}" to "${defaultConfigPath()}" and edit the mappings.`
+    );
+  }
+
+  let raw;
+  try {
+    raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new Error(`Invalid JSON in ${file}: ${e.message}`);
+  }
+
+  const cfg = mergeWithDefaults(raw);
+  validateConfig(cfg);
   return { cfg, file, created };
 }

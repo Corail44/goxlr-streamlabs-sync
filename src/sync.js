@@ -1,3 +1,17 @@
+function buildByChannel(mappings) {
+  const byChannel = new Map();
+  for (const m of mappings) {
+    const arr = byChannel.get(m.channel) ?? [];
+    arr.push({
+      source: m.source,
+      syncVolume: m.syncVolume !== false,
+      syncMute: m.syncMute !== false,
+    });
+    byChannel.set(m.channel, arr);
+  }
+  return byChannel;
+}
+
 // Maps GoXLR channel events to Streamlabs audio source updates.
 export class SyncEngine {
   constructor({ goxlr, slobs, config, logger, dryRun = false }) {
@@ -7,17 +21,7 @@ export class SyncEngine {
     this.log = logger;
     this.dryRun = dryRun;
 
-    this.byChannel = new Map();
-    for (const m of this.cfg.mappings) {
-      const arr = this.byChannel.get(m.channel) ?? [];
-      arr.push({
-        source: m.source,
-        syncVolume: m.syncVolume !== false,
-        syncMute: m.syncMute !== false,
-      });
-      this.byChannel.set(m.channel, arr);
-    }
-
+    this.byChannel = buildByChannel(this.cfg.mappings);
     this.resourceIds = new Map(); // source name -> resourceId | null
     this.throttles = new Map(); // source name -> { timer, lastSent, pendingV }
     this.lastResolve = 0;
@@ -30,6 +34,19 @@ export class SyncEngine {
       await this.resolveSources(true);
       this.pushFullState();
     });
+  }
+
+  // Hot-applies settings edited from the dashboard (no restart needed).
+  async applySettings({ mappings, muteMode } = {}) {
+    if (Array.isArray(mappings)) {
+      this.cfg.mappings = mappings;
+      this.byChannel = buildByChannel(mappings);
+      this.resourceIds.clear();
+    }
+    if (muteMode) this.cfg.muteMode = muteMode;
+    this.lastResolve = 0;
+    await this.resolveSources(true);
+    this.pushFullState();
   }
 
   deflection(v) {

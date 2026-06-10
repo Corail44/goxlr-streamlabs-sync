@@ -22,7 +22,9 @@ Similar tools exist for OBS Studio ([goxlr-obs-fader-sync](https://github.com/Fr
 - Works with the GoXLR Full and GoXLR Mini, and with multiple devices
 - Zero npm dependencies, single small Node.js process, auto-reconnects to both ends
 - Local web dashboard (live volumes, mute states, logs) and a **system tray icon** — nothing cluttering your taskbar
+- **Configure everything from the dashboard**: mappings editor (suggesting your live Streamlabs sources), mute behavior, *Start with Windows* toggle — applied instantly, no restart
 - **Standalone `.exe`** available (no Node.js install needed), built transparently by GitHub Actions
+- Update notifications (checks the GitHub releases once a day, can be disabled)
 - `--list` mode to discover your channels and exact source names
 - `--dry-run` mode to test safely
 
@@ -74,11 +76,9 @@ Then in **Settings → Output (Advanced mode) → Recording**: set the format to
 
 ### 2. Configure the sync
 
-```
-copy config.example.json config.json
-```
+**The easy way:** open the dashboard (http://127.0.0.1:14571) → **⚙️ Settings** → map each GoXLR channel to a Streamlabs source (the field suggests your live sources), pick the mute behavior, optionally enable *Start with Windows* — then **Save**. Changes apply instantly, no restart needed.
 
-Edit `config.json` — map GoXLR channels to the **exact** source names you created:
+**The file way:** edit `config.json` (start from `config.example.json`):
 
 ```json
 {
@@ -86,29 +86,21 @@ Edit `config.json` — map GoXLR channels to the **exact** source names you crea
     "mappings": [
       { "channel": "Mic",    "source": "Mic (GoXLR)" },
       { "channel": "Music",  "source": "Music (GoXLR)" },
-      { "channel": "Game",   "source": "Game (GoXLR)" },
-      { "channel": "System", "source": "System (GoXLR)" },
-      { "channel": "Chat",   "source": "Chat (GoXLR)" }
+      { "channel": "Game",   "source": "Game (GoXLR)" }
     ]
   }
 }
 ```
 
-Valid channels: `Mic`, `LineIn`, `Console`, `System`, `Game`, `Chat`, `Sample`, `Music`, `Headphones`, `MicMonitor`, `LineOut`.
+Valid channels: `Mic`, `LineIn`, `Console`, `System`, `Game`, `Chat`, `Sample`, `Music`, `Headphones`, `MicMonitor`, `LineOut`. Run `node src/index.js --list` to print your GoXLR channels and every Streamlabs source name.
 
-Not sure about names? Run:
-
-```
-node src/index.js --list
-```
-
-It prints your GoXLR channels (with live volumes) and every Streamlabs audio source name.
+**Where is config.json?** Search order: `--config <path>` → `config.json` in the current folder → next to the exe / project root → `%APPDATA%\goxlr-streamlabs-sync\config.json`. The packaged exe creates the APPDATA one on first run, so your settings persist no matter where the exe is launched from.
 
 ### 3. Run it
 
 A **tray icon** appears in the notification area: right-click for *Open dashboard* / *Quit*, double-click to open the dashboard.
 
-- **Standalone exe:** just run `goxlr-streamlabs-sync.exe`. For zero console window, add the `--hidden` flag (e.g. in a shortcut: `goxlr-streamlabs-sync.exe --hidden`).
+- **Standalone exe:** just run `goxlr-streamlabs-sync.exe` — it goes straight to the background (tray icon, no console window). Use `--console` to keep it attached to a terminal and see the logs.
 - **From source, no window:** double-click **`start-hidden.vbs`**.
 - **From source, with console:** `start.bat` or `npm start`.
 
@@ -116,7 +108,7 @@ Launching it again while it's already running simply reopens the dashboard (sing
 
 Move a fader on the GoXLR — the matching Streamlabs volume slider follows. 🎚️
 
-To launch it automatically with Windows: press `Win+R`, type `shell:startup`, and drop a shortcut there (to the exe with `--hidden`, or to `start-hidden.vbs`).
+To launch it automatically with Windows: enable **Start with Windows** in the dashboard settings (it registers the proper command in `HKCU\...\Run`).
 
 ### The dashboard
 
@@ -153,6 +145,7 @@ With a token configured, `auto` tries the pipe first and falls back to the webso
 | `ui.port` | `14571` | Dashboard port (also used as the single-instance lock) |
 | `ui.openBrowser` | `false` | Open the dashboard on startup (the `--open` flag does the same) |
 | `ui.tray` | `true` | Show the system tray icon (Windows) |
+| `updateCheck` | `true` | Check GitHub once a day for a newer release (shows a dashboard banner) |
 
 ### Mute modes
 

@@ -13,8 +13,10 @@
     "enabled": true,
     "host": "127.0.0.1",
     "port": 14571,
-    "openBrowser": false
+    "openBrowser": false,
+    "tray": true
   },
+  "updateCheck": true,
   "sync": {
     "throttleMs": 50,
     "curveExponent": 1.0,

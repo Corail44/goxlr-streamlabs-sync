@@ -22,7 +22,9 @@ Des outils équivalents existent pour OBS Studio ([goxlr-obs-fader-sync](https:/
 - Compatible GoXLR Full et Mini, multi-appareils
 - Zéro dépendance npm, un seul petit process Node.js, reconnexion automatique des deux côtés
 - Dashboard web local (volumes en direct, mutes, logs) et **icône dans la zone de notification** — rien qui traîne dans ta barre des tâches
+- **Tout se configure depuis le dashboard** : éditeur de mappings (qui propose tes sources Streamlabs en direct), comportement des mutes, interrupteur *Démarrer avec Windows* — appliqué instantanément, sans redémarrage
 - **`.exe` autonome** disponible (aucune installation de Node.js), compilé en toute transparence par GitHub Actions
+- Notification de mise à jour (vérifie les releases GitHub une fois par jour, désactivable)
 - Mode `--list` pour découvrir tes canaux et les noms exacts de tes sources
 - Mode `--dry-run` pour tester sans risque
 
@@ -74,11 +76,9 @@ Puis dans **Paramètres → Sortie (mode Avancé) → Enregistrement** : passe l
 
 ### 2. Configurer la sync
 
-```
-copy config.example.json config.json
-```
+**Le plus simple :** ouvre le dashboard (http://127.0.0.1:14571) → **⚙️ Réglages** → associe chaque canal GoXLR à une source Streamlabs (le champ propose tes sources en direct), choisis le comportement des mutes, active *Démarrer avec Windows* si tu veux — puis **Enregistrer**. C'est appliqué instantanément, sans redémarrage.
 
-Édite `config.json` — mappe les canaux GoXLR vers les noms **exacts** de tes sources :
+**Par fichier :** édite `config.json` (pars de `config.example.json`) :
 
 ```json
 {
@@ -86,29 +86,21 @@ copy config.example.json config.json
     "mappings": [
       { "channel": "Mic",    "source": "Mic (GoXLR)" },
       { "channel": "Music",  "source": "Music (GoXLR)" },
-      { "channel": "Game",   "source": "Game (GoXLR)" },
-      { "channel": "System", "source": "System (GoXLR)" },
-      { "channel": "Chat",   "source": "Chat (GoXLR)" }
+      { "channel": "Game",   "source": "Game (GoXLR)" }
     ]
   }
 }
 ```
 
-Canaux valides : `Mic`, `LineIn`, `Console`, `System`, `Game`, `Chat`, `Sample`, `Music`, `Headphones`, `MicMonitor`, `LineOut`.
+Canaux valides : `Mic`, `LineIn`, `Console`, `System`, `Game`, `Chat`, `Sample`, `Music`, `Headphones`, `MicMonitor`, `LineOut`. Lance `node src/index.js --list` pour afficher tes canaux GoXLR et le nom de chaque source Streamlabs.
 
-Pas sûr des noms ? Lance :
-
-```
-node src/index.js --list
-```
-
-Ça affiche tes canaux GoXLR (avec les volumes en direct) et le nom de chaque source audio Streamlabs.
+**Où est le config.json ?** Ordre de recherche : `--config <chemin>` → `config.json` du dossier courant → à côté de l'exe / racine du projet → `%APPDATA%\goxlr-streamlabs-sync\config.json`. L'exe crée celui d'APPDATA au premier lancement : tes réglages persistent peu importe d'où l'exe est lancé.
 
 ### 3. Lancer
 
 Une **icône apparaît dans la zone de notification** : clic droit pour *Ouvrir le dashboard* / *Quitter*, double-clic pour ouvrir le dashboard.
 
-- **Exe autonome :** lance simplement `goxlr-streamlabs-sync.exe`. Pour zéro fenêtre console, ajoute le flag `--hidden` (dans un raccourci : `goxlr-streamlabs-sync.exe --hidden`).
+- **Exe autonome :** lance simplement `goxlr-streamlabs-sync.exe` — il file directement en arrière-plan (icône de notification, aucune fenêtre console). Utilise `--console` pour le garder attaché à un terminal et voir les logs.
 - **Depuis les sources, sans fenêtre :** double-clique sur **`start-hidden.vbs`**.
 - **Depuis les sources, avec console :** `start.bat` ou `npm start`.
 
@@ -116,7 +108,7 @@ Relancer alors que c'est déjà lancé rouvre simplement le dashboard (instance 
 
 Bouge un fader sur le GoXLR — le slider Streamlabs correspondant suit. 🎚️
 
-Pour le lancer automatiquement avec Windows : `Win+R`, tape `shell:startup`, et dépose un raccourci dans ce dossier (vers l'exe avec `--hidden`, ou vers `start-hidden.vbs`).
+Pour le lancer automatiquement avec Windows : active **Démarrer avec Windows** dans les réglages du dashboard (ça enregistre la bonne commande dans `HKCU\...\Run`).
 
 ### Le dashboard
 
@@ -153,6 +145,7 @@ Avec un token configuré, `auto` essaie le pipe puis bascule tout seul sur le we
 | `ui.port` | `14571` | Port du dashboard (sert aussi de verrou d'instance unique) |
 | `ui.openBrowser` | `false` | Ouvre le dashboard au démarrage (le flag `--open` fait pareil) |
 | `ui.tray` | `true` | Affiche l'icône dans la zone de notification (Windows) |
+| `updateCheck` | `true` | Vérifie une fois par jour sur GitHub si une nouvelle version existe (bannière dans le dashboard) |
 
 ### Modes de mute
 

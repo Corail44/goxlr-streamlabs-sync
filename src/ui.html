@@ -8,7 +8,7 @@
 <style>
   :root {
     --bg: #0e1217; --panel: #161c24; --panel2: #0b0f14; --border: #232c38;
-    --text: #dfe9f2; --muted: #8aa0b5; --ok: #2ecc71; --bad: #e74c3c; --warn: #f1c40f;
+    --text: #dfe9f2; --muted: #8aa0b5; --ok: #2ecc71; --bad: #e74c3c; --warn: #f1c40f; --accent: #27ae60;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, "Segoe UI", sans-serif; }
@@ -17,11 +17,17 @@
   h1 .v { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
   #quit { background: transparent; color: var(--bad); border: 1px solid var(--bad); border-radius: 8px; padding: 6px 14px; cursor: pointer; font: inherit; }
   #quit:hover { background: var(--bad); color: #fff; }
+  #update { display: none; margin: 14px 18px 0; padding: 10px 14px; border-radius: 10px; background: #14301f; border: 1px solid var(--accent); }
+  #update a { color: var(--ok); font-weight: 600; }
   .chips { display: flex; gap: 10px; flex-wrap: wrap; padding: 14px 18px 0; }
   .chip { padding: 6px 14px; border-radius: 999px; background: var(--panel); border: 1px solid var(--border); font-size: 13px; }
   .chip::before { content: "●"; margin-right: 8px; }
   .chip.ok::before { color: var(--ok); }
   .chip.bad::before { color: var(--bad); }
+  #onboarding { display: none; margin: 16px 18px 0; padding: 14px 18px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+  #onboarding h2 { margin: 0 0 8px; font-size: 14px; }
+  #onboarding ol { margin: 0; padding-left: 20px; color: var(--muted); }
+  #onboarding li { margin: 4px 0; }
   #channels { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; padding: 16px 18px; }
   .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
   .card .row { display: flex; align-items: center; justify-content: space-between; }
@@ -33,7 +39,23 @@
   .src { margin-top: 10px; font-size: 12px; color: var(--muted); }
   .src .bad { color: var(--bad); text-decoration: line-through; }
   details { margin: 4px 18px 18px; }
-  summary { cursor: pointer; color: var(--muted); user-select: none; }
+  summary { cursor: pointer; color: var(--muted); user-select: none; font-weight: 600; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-top: 8px; }
+  .set-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
+  .set-row label { min-width: 180px; color: var(--muted); }
+  select, input[type=text] { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font: inherit; }
+  select:focus, input:focus { outline: 1px solid var(--accent); }
+  input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
+  .map-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+  .map-row select { width: 140px; }
+  .map-row input { flex: 1; min-width: 160px; }
+  .x { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+  .x:hover { border-color: var(--bad); color: var(--bad); }
+  .btn { background: var(--accent); border: none; color: #fff; border-radius: 8px; padding: 8px 18px; cursor: pointer; font: inherit; font-weight: 600; }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); font-weight: 400; }
+  #save-status { margin-left: 10px; font-size: 13px; }
+  .small { color: var(--muted); font-size: 12px; margin-top: 10px; word-break: break-all; }
   #logs { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-top: 8px;
           max-height: 320px; overflow-y: auto; font: 12px/1.5 Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
   .lg-info { color: #9fb6c9; } .lg-ok { color: var(--ok); } .lg-warn { color: var(--warn); } .lg-error { color: var(--bad); } .lg-debug { color: #5d7286; }
@@ -48,45 +70,127 @@
   <h1>🎚️ goxlr-streamlabs-sync<span class="v">v__VERSION__</span></h1>
   <button id="quit"></button>
 </header>
+<div id="update"></div>
 <div class="chips">
   <div class="chip" id="chip-goxlr"></div>
   <div class="chip" id="chip-slobs"></div>
 </div>
+<div id="onboarding"></div>
 <main id="channels"></main>
+
+<details id="settings-wrap">
+  <summary id="settings-title"></summary>
+  <div class="panel">
+    <div class="set-row">
+      <label id="lb-autostart"></label>
+      <input type="checkbox" id="autostart">
+      <span class="small" id="autostart-info"></span>
+    </div>
+    <div class="set-row">
+      <label id="lb-mutemode"></label>
+      <select id="mutemode"></select>
+    </div>
+    <div class="set-row" style="align-items:flex-start">
+      <label id="lb-mappings"></label>
+      <div style="flex:1">
+        <div id="map-rows"></div>
+        <button class="x" id="map-add" style="margin-top:6px">＋ <span id="lb-add"></span></button>
+      </div>
+    </div>
+    <div class="set-row">
+      <label></label>
+      <button class="btn" id="save"></button>
+      <span id="save-status"></span>
+    </div>
+    <div class="small" id="cfg-path"></div>
+  </div>
+</details>
+
 <details open>
   <summary id="log-title"></summary>
   <div id="logs"></div>
 </details>
 <footer id="hint"></footer>
 <div id="overlay"><div class="box" id="overlay-msg"></div></div>
+<datalist id="sources-list"></datalist>
+
 <script>
-  const FR = (navigator.language || '').toLowerCase().startsWith('fr');
-  const T = FR ? {
-    quit: 'Quitter', confirmQuit: 'Arrêter la synchronisation ?',
-    stopped: 'Sync arrêtée. Tu peux fermer cet onglet.',
-    lost: 'Connexion au dashboard perdue — reconnexion en cours…',
-    logs: 'Journal', muted: 'MUTE',
-    connected: 'connecté', disconnected: 'déconnecté',
-    via: 'via', hint: 'Fermer cet onglet ne stoppe pas la sync — elle tourne en arrière-plan.',
-  } : {
-    quit: 'Quit', confirmQuit: 'Stop the synchronization?',
-    stopped: 'Sync stopped. You can close this tab.',
-    lost: 'Dashboard connection lost — reconnecting…',
-    logs: 'Logs', muted: 'MUTED',
-    connected: 'connected', disconnected: 'disconnected',
-    via: 'via', hint: 'Closing this tab does not stop the sync — it keeps running in the background.',
+  const LANGS = {
+    fr: {
+      quit: 'Quitter', confirmQuit: 'Arrêter la synchronisation ?',
+      stopped: 'Sync arrêtée. Tu peux fermer cet onglet.',
+      lost: 'Connexion au dashboard perdue — reconnexion en cours…',
+      logs: 'Journal', muted: 'MUTE',
+      connected: 'connecté', disconnected: 'déconnecté', via: 'via',
+      hint: "Fermer cet onglet ne stoppe pas la sync — elle tourne en arrière-plan.",
+      settings: 'Réglages',
+      autostart: 'Démarrer avec Windows',
+      muteMode: 'Comportement des mutes',
+      muteModes: { follow_stream: 'Suivre le stream (recommandé)', any: "N'importe quel mute", off: 'Ignorer les mutes' },
+      mappings: 'Mappings canal → source',
+      add: 'Ajouter un mapping',
+      save: 'Enregistrer',
+      saved: '✓ Enregistré et appliqué',
+      cfgFile: 'Fichier de config : ',
+      updateAvailable: (v) => `⬆ Une nouvelle version v${v} est disponible !`,
+      download: 'Télécharger',
+      onbTitle: '🚀 Premiers pas',
+      onbSteps: [
+        "Dans Streamlabs, ajoute une source « Capture de sortie audio » pour chaque périphérique GoXLR voulu (Game, Music, Chat, System) et une « Capture d'entrée audio » sur Chat Mic.",
+        'Ouvre les Réglages ci-dessous et associe chaque canal GoXLR à ta source Streamlabs (la liste propose tes sources en direct).',
+        'Enregistre, puis bouge un fader sur le GoXLR : le slider Streamlabs doit suivre. 🎚️',
+        "Pour les pistes séparées à l'enregistrement : Paramètres Streamlabs → Sortie (mode Avancé) → format MKV/MP4 et 6 pistes audio.",
+      ],
+      onbDoc: 'Guide complet : ',
+    },
+    en: {
+      quit: 'Quit', confirmQuit: 'Stop the synchronization?',
+      stopped: 'Sync stopped. You can close this tab.',
+      lost: 'Dashboard connection lost — reconnecting…',
+      logs: 'Logs', muted: 'MUTED',
+      connected: 'connected', disconnected: 'disconnected', via: 'via',
+      hint: 'Closing this tab does not stop the sync — it keeps running in the background.',
+      settings: 'Settings',
+      autostart: 'Start with Windows',
+      muteMode: 'Mute behavior',
+      muteModes: { follow_stream: 'Follow the stream (recommended)', any: 'Any mute', off: 'Ignore mutes' },
+      mappings: 'Channel → source mappings',
+      add: 'Add a mapping',
+      save: 'Save',
+      saved: '✓ Saved and applied',
+      cfgFile: 'Config file: ',
+      updateAvailable: (v) => `⬆ A new version v${v} is available!`,
+      download: 'Download',
+      onbTitle: '🚀 Getting started',
+      onbSteps: [
+        'In Streamlabs, add an "Audio Output Capture" source for each GoXLR device you want (Game, Music, Chat, System) and an "Audio Input Capture" on Chat Mic.',
+        'Open the Settings below and map each GoXLR channel to your Streamlabs source (the list suggests your live sources).',
+        'Save, then move a fader on the GoXLR: the Streamlabs slider should follow. 🎚️',
+        'For separated tracks in recordings: Streamlabs Settings → Output (Advanced) → MKV/MP4 format and 6 audio tracks.',
+      ],
+      onbDoc: 'Full guide: ',
+    },
   };
+  const T = LANGS[(navigator.language || 'en').slice(0, 2)] || LANGS.en;
 
   const $ = (s) => document.querySelector(s);
   $('#quit').textContent = T.quit;
   $('#log-title').textContent = T.logs;
   $('#hint').textContent = T.hint;
+  $('#settings-title').textContent = '⚙️ ' + T.settings;
+  $('#lb-autostart').textContent = T.autostart;
+  $('#lb-mutemode').textContent = T.muteMode;
+  $('#lb-mappings').textContent = T.mappings;
+  $('#lb-add').textContent = T.add;
+  $('#save').textContent = T.save;
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const hhmmss = (t) => new Date(t).toTimeString().slice(0, 8);
 
   let quitRequested = false;
   let logsInit = false;
+  let settingsInit = false;
+  let channelsList = [];
 
   function chip(el, ok, label) {
     el.className = 'chip ' + (ok ? 'ok' : 'bad');
@@ -99,6 +203,11 @@
     chip($('#chip-slobs'), s.streamlabs.connected,
       'Streamlabs ' + (s.streamlabs.connected ? T.connected + ' ' + T.via + ' ' + s.streamlabs.mode : T.disconnected));
 
+    if (s.update && s.update.available) {
+      $('#update').style.display = 'block';
+      $('#update').innerHTML = `${esc(T.updateAvailable(s.update.latest))} <a href="${esc(s.update.url)}" target="_blank" rel="noopener">${esc(T.download)} →</a>`;
+    }
+
     $('#channels').innerHTML = s.channels.map((c) => `
       <div class="card">
         <div class="row"><span class="ch-name">${esc(c.channel)}</span>${c.muted ? `<span class="badge">${T.muted}</span>` : ''}</div>
@@ -107,6 +216,23 @@
         <div class="src">${c.sources.map((x) => `<span class="${x.resolved ? '' : 'bad'}">→ ${esc(x.name)}</span>`).join('<br>')}</div>
       </div>`).join('');
 
+    const allUnresolved = s.channels.length > 0 && s.streamlabs.connected &&
+      s.channels.every((c) => c.sources.every((x) => !x.resolved));
+    const showOnb = s.settings.mappings.length === 0 || allUnresolved;
+    $('#onboarding').style.display = showOnb ? 'block' : 'none';
+    if (showOnb && !$('#onboarding').innerHTML) {
+      $('#onboarding').innerHTML = `<h2>${T.onbTitle}</h2><ol>${T.onbSteps.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>
+        <div class="small">${T.onbDoc}<a href="https://github.com/Corail44/goxlr-streamlabs-sync#readme" target="_blank" rel="noopener" style="color:var(--ok)">README</a></div>`;
+      $('#settings-wrap').open = true;
+    }
+
+    channelsList = s.channels_list || channelsList;
+    if (!settingsInit) {
+      settingsInit = true;
+      initSettings(s);
+    }
+    $('#cfg-path').textContent = s.configFile ? T.cfgFile + s.configFile : '';
+
     if (!logsInit) {
       logsInit = true;
       $('#logs').innerHTML = '';
@@ -114,6 +240,96 @@
     }
   }
 
+  // --- Settings panel -------------------------------------------------------
+  function mapRow(channel, source) {
+    const row = document.createElement('div');
+    row.className = 'map-row';
+    const sel = document.createElement('select');
+    for (const ch of channelsList) {
+      const o = document.createElement('option');
+      o.value = ch;
+      o.textContent = ch;
+      if (ch === channel) o.selected = true;
+      sel.appendChild(o);
+    }
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.setAttribute('list', 'sources-list');
+    inp.placeholder = 'Streamlabs source...';
+    inp.value = source || '';
+    const del = document.createElement('button');
+    del.className = 'x';
+    del.textContent = '✕';
+    del.onclick = () => row.remove();
+    row.append(sel, inp, del);
+    return row;
+  }
+
+  async function refreshSources() {
+    try {
+      const r = await fetch('/api/sources').then((x) => x.json());
+      $('#sources-list').innerHTML = (r.sources || []).map((n) => `<option value="${esc(n)}">`).join('');
+    } catch {}
+  }
+
+  function initSettings(s) {
+    const mm = $('#mutemode');
+    mm.innerHTML = '';
+    for (const mode of ['follow_stream', 'any', 'off']) {
+      const o = document.createElement('option');
+      o.value = mode;
+      o.textContent = T.muteModes[mode];
+      if (mode === s.settings.muteMode) o.selected = true;
+      mm.appendChild(o);
+    }
+    const rows = $('#map-rows');
+    rows.innerHTML = '';
+    for (const m of s.settings.mappings) rows.appendChild(mapRow(m.channel, m.source));
+    refreshSources();
+
+    fetch('/api/autostart').then((x) => x.json()).then((a) => {
+      $('#autostart').checked = !!a.enabled;
+    }).catch(() => {});
+  }
+
+  $('#map-add').addEventListener('click', () => {
+    $('#map-rows').appendChild(mapRow(channelsList[0] || 'Mic', ''));
+    refreshSources();
+  });
+
+  $('#autostart').addEventListener('change', async (e) => {
+    const enabled = e.target.checked;
+    try {
+      const r = await fetch('/api/autostart', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled }) }).then((x) => x.json());
+      if (r.error) throw new Error(r.error);
+      $('#autostart-info').textContent = r.warning || (r.command || '');
+    } catch (err) {
+      $('#autostart-info').textContent = '⚠ ' + err.message;
+      e.target.checked = !enabled;
+    }
+  });
+
+  $('#save').addEventListener('click', async () => {
+    const mappings = [...document.querySelectorAll('#map-rows .map-row')]
+      .map((row) => ({ channel: row.querySelector('select').value, source: row.querySelector('input').value.trim() }))
+      .filter((m) => m.source);
+    const body = { mappings, muteMode: $('#mutemode').value };
+    const st = $('#save-status');
+    st.style.color = 'var(--muted)';
+    st.textContent = '…';
+    try {
+      const r = await fetch('/api/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then((x) => x.json());
+      if (r.error) throw new Error(r.error);
+      st.style.color = 'var(--ok)';
+      st.textContent = T.saved;
+      setTimeout(() => { st.textContent = ''; }, 4000);
+    } catch (err) {
+      st.style.color = 'var(--bad)';
+      st.textContent = '⚠ ' + err.message;
+    }
+  });
+
+  // --- Logs / lifecycle ------------------------------------------------------
   function addLog(l) {
     const el = document.createElement('div');
     el.className = 'lg-' + l.level;

@@ -10,6 +10,7 @@ import { StreamlabsClient } from './streamlabs.js';
 import { SyncEngine } from './sync.js';
 import { startWebUI, openInBrowser } from './webui.js';
 import { startTray } from './tray.js';
+import { startUpdateChecker } from './update.js';
 
 let VERSION = '0.0.0';
 try {
@@ -26,11 +27,15 @@ Usage:
   node src/index.js [options]          (from source)
   goxlr-streamlabs-sync.exe [options]  (packaged)
 
+The packaged exe, launched without arguments, runs in the background
+(tray icon + dashboard, no console window).
+
 Options:
-  --config <path>   Use a specific config file (default: ./config.json)
+  --config <path>   Use a specific config file
   --list            List GoXLR channels and Streamlabs audio sources, then exit
   --open            Open the web dashboard in your browser on startup
   --hidden          Relaunch in the background (no console window) and exit
+  --console         Stay attached to the console (skip the exe's auto-background)
   --no-ui           Disable the web dashboard and tray icon for this run
   --dry-run         Log what would be sent to Streamlabs without sending it
   --verbose         Show debug output
@@ -39,13 +44,23 @@ Options:
 `;
 
 function parseArgs(argv) {
-  const args = { config: null, list: false, dryRun: false, verbose: false, open: false, noUi: false, hidden: false };
+  const args = {
+    config: null,
+    list: false,
+    dryRun: false,
+    verbose: false,
+    open: false,
+    noUi: false,
+    hidden: false,
+    console: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--config') args.config = argv[++i];
     else if (a === '--list') args.list = true;
     else if (a === '--open') args.open = true;
     else if (a === '--hidden') args.hidden = true;
+    else if (a === '--console') args.console = true;
     else if (a === '--no-ui') args.noUi = true;
     else if (a === '--dry-run') args.dryRun = true;
     else if (a === '--verbose') args.verbose = true;
@@ -62,6 +77,11 @@ function parseArgs(argv) {
     }
   }
   return args;
+}
+
+function relaunchDetached(extraArgs) {
+  const rest = (IS_SEA ? process.argv.slice(2) : process.argv.slice(1)).filter((a) => a !== '--hidden');
+  spawn(process.execPath, [...rest, ...extraArgs], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
 }
 
 function waitFor(emitter, event, ms) {
@@ -123,13 +143,22 @@ async function listMode(cfg, log) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  const userArgs = process.argv.slice(2);
+  const args = parseArgs(userArgs);
 
   // --hidden: relaunch ourselves detached without a console window, then exit.
   if (args.hidden) {
-    const rest = (IS_SEA ? process.argv.slice(2) : process.argv.slice(1)).filter((a) => a !== '--hidden');
-    spawn(process.execPath, rest, { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    relaunchDetached(['--console']);
     console.log('goxlr-streamlabs-sync: running in the background (tray icon / dashboard).');
+    process.exit(0);
+  }
+
+  // Packaged exe double-clicked with no arguments: don't keep a console
+  // window hostage — hand over to a detached background process.
+  if (IS_SEA && userArgs.length === 0) {
+    relaunchDetached(['--console']);
+    console.log('goxlr-streamlabs-sync: running in the background (tray icon / dashboard).');
+    console.log('Tip: run with --console to keep it attached to a terminal.');
     process.exit(0);
   }
 
@@ -147,13 +176,13 @@ async function main() {
   logger.info(`goxlr-streamlabs-sync v${VERSION}${args.dryRun ? ' (dry-run)' : ''}`);
   logger.info(`Config: ${file ?? '(defaults — no config.json yet)'}`);
   if (created) {
-    logger.warn(`A default config.json was created next to the executable — edit its "mappings" to match your Streamlabs sources!`);
+    logger.warn('A default config.json was created — open the dashboard to set up your mappings!');
   }
 
   if (args.list) return listMode(cfg, logger);
 
   if (!cfg.sync.mappings.length) {
-    logger.warn('No mappings configured — nothing will be synced. Edit config.json (see config.example.json).');
+    logger.warn('No mappings configured yet — open the dashboard and add them in the Settings panel.');
   }
 
   const goxlr = new GoXLRClient({ ...cfg.goxlr, logger });
@@ -170,18 +199,22 @@ async function main() {
     process.exit(0);
   };
 
+  let updateInfo = { available: false, latest: null, url: null };
+
   // Start the dashboard before connecting: its port doubles as the
   // single-instance lock (a second launch just reopens the dashboard).
   if (cfg.ui.enabled && !args.noUi) {
     try {
       await startWebUI({
         cfg,
+        configFile: file,
         goxlr,
         slobs,
         engine,
         logger,
         version: VERSION,
-        openBrowser: args.open || cfg.ui.openBrowser,
+        getUpdate: () => updateInfo,
+        openBrowser: args.open || cfg.ui.openBrowser || created,
       });
     } catch (e) {
       if (e.code === 'EADDRINUSE') {
@@ -195,6 +228,15 @@ async function main() {
       startTray({ url: dashUrl, logger, onQuit: () => shutdown('tray') });
     }
   }
+
+  startUpdateChecker({
+    version: VERSION,
+    enabled: cfg.updateCheck,
+    logger,
+    onUpdate: (info) => {
+      updateInfo = info;
+    },
+  });
 
   goxlr.connect();
   slobs.connect();
