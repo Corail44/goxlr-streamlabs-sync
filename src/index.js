@@ -11,6 +11,20 @@ import { SyncEngine } from './sync.js';
 import { startWebUI, openInBrowser } from './webui.js';
 import { startTray } from './tray.js';
 import { startUpdateChecker } from './update.js';
+import { notify, makeConnectionNotifier } from './notify.js';
+
+// Safety net: a background control-plane tool should log and keep running,
+// not die on an unexpected error.
+process.on('uncaughtException', (e) => {
+  try {
+    logger.error(`Uncaught exception: ${e?.stack ?? e}`);
+  } catch {}
+});
+process.on('unhandledRejection', (e) => {
+  try {
+    logger.error(`Unhandled rejection: ${e?.stack ?? e}`);
+  } catch {}
+});
 
 let VERSION = '0.0.0';
 try {
@@ -189,6 +203,10 @@ async function main() {
   const slobs = new StreamlabsClient({ ...cfg.streamlabs, logger });
   const engine = new SyncEngine({ goxlr, slobs, config: cfg, logger, dryRun: args.dryRun });
 
+  const connectionToast = makeConnectionNotifier({ enabled: cfg.ui.notifications, logger });
+  goxlr.on('disconnected', () => connectionToast('goxlr', 'GoXLR Utility connection lost, reconnecting...'));
+  slobs.on('disconnected', () => connectionToast('slobs', 'Streamlabs Desktop connection lost, reconnecting...'));
+
   const dashHost = cfg.ui.host === '0.0.0.0' ? '127.0.0.1' : cfg.ui.host;
   const dashUrl = `http://${dashHost}:${cfg.ui.port}`;
 
@@ -204,25 +222,41 @@ async function main() {
   // Start the dashboard before connecting: its port doubles as the
   // single-instance lock (a second launch just reopens the dashboard).
   if (cfg.ui.enabled && !args.noUi) {
-    try {
-      await startWebUI({
-        cfg,
-        configFile: file,
-        goxlr,
-        slobs,
-        engine,
-        logger,
-        version: VERSION,
-        getUpdate: () => updateInfo,
-        openBrowser: args.open || cfg.ui.openBrowser || created,
-      });
-    } catch (e) {
-      if (e.code === 'EADDRINUSE') {
-        logger.warn(`Already running (dashboard port ${cfg.ui.port} is busy) - opening ${dashUrl} instead.`);
-        openInBrowser(dashUrl, logger);
+    const uiOptions = {
+      cfg,
+      configFile: file,
+      goxlr,
+      slobs,
+      engine,
+      logger,
+      version: VERSION,
+      getUpdate: () => updateInfo,
+      openBrowser: args.open || cfg.ui.openBrowser || created,
+      onRestart: () => {
+        logger.info('Restarting (settings change).');
+        relaunchDetached(['--console']);
         process.exit(0);
+      },
+    };
+    // Retry once on a busy port: during a self-restart (or login autostart),
+    // the previous instance may need a moment to release it.
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await startWebUI(uiOptions);
+        break;
+      } catch (e) {
+        if (e.code === 'EADDRINUSE') {
+          if (attempt < 3) {
+            await new Promise((r) => setTimeout(r, 1200));
+            continue;
+          }
+          logger.warn(`Already running (dashboard port ${cfg.ui.port} is busy) - opening ${dashUrl} instead.`);
+          openInBrowser(dashUrl, logger);
+          process.exit(0);
+        }
+        logger.warn(`[ui] Dashboard failed to start (${e.message}) - continuing without it.`);
+        break;
       }
-      logger.warn(`[ui] Dashboard failed to start (${e.message}) - continuing without it.`);
     }
     if (cfg.ui.tray && process.platform === 'win32') {
       startTray({ url: dashUrl, logger, onQuit: () => shutdown('tray') });
@@ -234,7 +268,11 @@ async function main() {
     enabled: cfg.updateCheck,
     logger,
     onUpdate: (info) => {
+      const isNew = !updateInfo.available;
       updateInfo = info;
+      if (isNew && cfg.ui.notifications) {
+        notify('goxlr-streamlabs-sync', `Update available: v${info.latest}`, logger);
+      }
     },
   });
 

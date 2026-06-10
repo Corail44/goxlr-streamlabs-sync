@@ -1,7 +1,8 @@
 import http from 'node:http';
 import fs from 'node:fs';
+import os from 'node:os';
 import { spawn } from 'node:child_process';
-import { readAssetText, readAssetBuffer } from './assets.js';
+import { IS_SEA, readAssetText, readAssetBuffer } from './assets.js';
 import { CHANNELS, defaultConfigPath, mergeWithDefaults, saveConfigFile, validateConfig } from './config.js';
 import { getAutostart, setAutostart } from './autostart.js';
 import { testStreamlabsToken } from './streamlabs.js';
@@ -37,7 +38,7 @@ function readBody(req, limit = 64 * 1024) {
 
 // Tiny local dashboard: status page + Server-Sent Events stream + settings API.
 // No dependencies.
-export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, version, getUpdate, openBrowser = false }) {
+export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, version, getUpdate, openBrowser = false, onRestart = null }) {
   const ui = cfg.ui;
   const html = readAssetText('src/ui.html').replace('__VERSION__', version);
   const clients = new Set();
@@ -47,6 +48,19 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
     const m = /^wss?:\/\/([^:/]+):(\d+)/.exec(cfg.streamlabs.url) ?? [];
     return { host: m[1] ?? '127.0.0.1', port: Number(m[2] ?? 59650) };
   };
+
+  const lanUrls = () => {
+    if (cfg.ui.host !== '0.0.0.0') return [];
+    const urls = [];
+    for (const list of Object.values(os.networkInterfaces() ?? {})) {
+      for (const itf of list ?? []) {
+        if (itf.family === 'IPv4' && !itf.internal) urls.push(`http://${itf.address}:${cfg.ui.port}`);
+      }
+    }
+    return urls;
+  };
+
+  let live = { streaming: 'offline', recording: 'offline' };
 
   const state = () => ({
     version,
@@ -66,6 +80,15 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       slobsHost: parseSlobsUrl().host,
       slobsPort: parseSlobsUrl().port,
       twoWay: cfg.sync.twoWay !== false,
+      notifications: cfg.ui.notifications !== false,
+    },
+    live,
+    lan: { enabled: cfg.ui.host === '0.0.0.0', urls: lanUrls() },
+    profile: {
+      active: goxlr.snapshotNow?.profileName ?? null,
+      dedicated: engine.usingDedicatedSet(),
+      list: Object.keys(cfg.sync.profiles ?? {}),
+      activeMappings: engine.activeSet(),
     },
     submixActive: !!goxlr.snapshotNow?.submixActive,
     channels: [...engine.byChannel.entries()].map(([ch, maps]) => ({
@@ -89,10 +112,42 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
     }, 100);
   };
 
-  for (const ev of ['ready', 'volume', 'mute', 'submix', 'disconnected']) goxlr.on(ev, pushState);
+  for (const ev of ['ready', 'volume', 'mute', 'submix', 'profile', 'disconnected']) goxlr.on(ev, pushState);
   slobs.on('connected', pushState);
   slobs.on('disconnected', pushState);
   slobs.on('apiEvent', pushState);
+
+  // Streaming / recording status (used for the LIVE badge and quit guard).
+  let liveTimer = null;
+  const fetchLive = () => {
+    if (liveTimer) return;
+    liveTimer = setTimeout(async () => {
+      liveTimer = null;
+      if (!slobs.connected) return;
+      try {
+        const m = await slobs.call('getModel', 'StreamingService');
+        live = { streaming: m?.streamingStatus ?? 'offline', recording: m?.recordingStatus ?? 'offline' };
+      } catch (e) {
+        logger.debug(`[ui] StreamingService.getModel failed: ${e.message}`);
+      }
+      pushState();
+    }, 250);
+  };
+  slobs.on('connected', async () => {
+    try {
+      await slobs.call('streamingStatusChange', 'StreamingService');
+      await slobs.call('recordingStatusChange', 'StreamingService');
+    } catch (e) {
+      logger.debug(`[ui] StreamingService subscriptions failed: ${e.message}`);
+    }
+    fetchLive();
+  });
+  slobs.on('disconnected', () => {
+    live = { streaming: 'offline', recording: 'offline' };
+  });
+  slobs.on('apiEvent', (rid) => {
+    if (typeof rid === 'string' && rid.startsWith('StreamingService.')) fetchLive();
+  });
   logger.subscribe((line) => {
     const payload = `event: log\ndata: ${JSON.stringify(line)}\n\n`;
     for (const res of clients) res.write(payload);
@@ -120,18 +175,39 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
         raw = {};
       }
     }
-    const next = mergeWithDefaults(raw);
-    next.streamlabs.token = next.streamlabs.token ?? cfg.streamlabs.token;
-    if (Array.isArray(body.mappings)) {
-      next.sync.mappings = body.mappings.map((m) => ({
+    const cleanMappings = (arr) =>
+      arr.map((m) => ({
         channel: String(m.channel ?? ''),
         source: String(m.source ?? '').trim(),
         ...(m.syncVolume === false ? { syncVolume: false } : {}),
         ...(m.syncMute === false ? { syncMute: false } : {}),
       }));
-    }
+
+    const next = mergeWithDefaults(raw);
+    next.streamlabs.token = next.streamlabs.token ?? cfg.streamlabs.token;
+    next.sync.profiles = { ...(next.sync.profiles ?? {}), ...(cfg.sync.profiles ?? {}) };
+    if (Array.isArray(body.mappings) && !body.profileSet) next.sync.mappings = cleanMappings(body.mappings);
     if (typeof body.muteMode === 'string') next.sync.muteMode = body.muteMode;
     if (typeof body.twoWay === 'boolean') next.sync.twoWay = body.twoWay;
+    if (typeof body.notifications === 'boolean') next.ui.notifications = body.notifications;
+
+    // Dedicated mapping sets per GoXLR profile
+    if (body.profileSet && typeof body.profileSet.name === 'string' && body.profileSet.name.trim()) {
+      next.sync.profiles[body.profileSet.name.trim()] = cleanMappings(
+        Array.isArray(body.profileSet.mappings) ? body.profileSet.mappings : []
+      );
+    }
+    if (typeof body.profileDelete === 'string') {
+      delete next.sync.profiles[body.profileDelete];
+    }
+
+    // LAN access toggle (rebinds at next start)
+    let needsRestart = false;
+    if (typeof body.lanAccess === 'boolean') {
+      const wanted = body.lanAccess ? '0.0.0.0' : '127.0.0.1';
+      if (wanted !== cfg.ui.host) needsRestart = true;
+      next.ui.host = wanted;
+    }
     const newToken = typeof body.token === 'string' ? body.token.trim() : '';
     if (newToken) next.streamlabs.token = newToken;
 
@@ -170,10 +246,12 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       cfg.streamlabs.url = next.streamlabs.url;
       slobs.url = next.streamlabs.url.replace(/\/+$/, '');
     }
+    cfg.sync.profiles = next.sync.profiles;
+    cfg.ui.notifications = next.ui.notifications;
     await engine.applySettings({ mappings: next.sync.mappings, muteMode: next.sync.muteMode, twoWay: next.sync.twoWay });
     logger.ok(`[ui] Settings saved to ${target}`);
     pushState();
-    json(res, 200, { ok: true, file: target });
+    json(res, 200, { ok: true, file: target, needsRestart });
   }
 
   const server = http.createServer(async (req, res) => {
@@ -220,6 +298,27 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
         }
       } else if (req.method === 'POST' && url === '/api/config') {
         await handleConfigSave(req, res);
+      } else if (req.method === 'GET' && url === '/api/diagnostic') {
+        const report = [
+          `goxlr-streamlabs-sync v${version}`,
+          `node ${process.version} | ${process.platform} ${os.release()} | packaged=${IS_SEA}`,
+          `config: ${cfgFile ?? '(none)'}`,
+          `goxlr: ${goxlr.serial ?? 'disconnected'} (${goxlr.status?.mixers?.[goxlr.serial]?.hardware?.device_type ?? '-'}) submixActive=${!!goxlr.snapshotNow?.submixActive} profile=${goxlr.snapshotNow?.profileName ?? '-'}`,
+          `streamlabs: ${slobs.connected ? slobs.mode : 'disconnected'} | streaming=${live.streaming} recording=${live.recording}`,
+          `twoWay=${cfg.sync.twoWay} muteMode=${cfg.sync.muteMode} uiHost=${cfg.ui.host}`,
+          `active mappings (${engine.activeSet().length})${engine.usingDedicatedSet() ? ` [profile ${engine.activeProfile}]` : ' [default]'}:`,
+          ...engine.activeSet().map((m) => `  ${m.channel} -> "${m.source}" resolved=${!!engine.resourceIds.get(m.source)} muted=${engine.slobsMuted.get(m.source) ?? '-'}`),
+          `profiles with dedicated sets: ${Object.keys(cfg.sync.profiles ?? {}).join(', ') || '(none)'}`,
+          '--- last logs ---',
+          ...logger.recent().slice(-40).map((l) => `[${l.level}] ${l.msg}`),
+        ].join('\n');
+        res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
+        res.end(report);
+      } else if (req.method === 'POST' && url === '/api/restart') {
+        if (!onRestart) return json(res, 400, { error: 'restart not available' });
+        json(res, 200, { ok: true });
+        logger.info('[ui] Restart requested from the dashboard.');
+        setTimeout(onRestart, 250);
       } else if (req.method === 'POST' && url === '/api/channel-mute') {
         let body;
         try {

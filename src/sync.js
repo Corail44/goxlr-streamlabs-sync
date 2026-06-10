@@ -29,6 +29,8 @@ export class SyncEngine {
     this.log = logger;
     this.dryRun = dryRun;
 
+    this.activeProfile = null; // GoXLR profile currently loaded on the device
+    this.activeKey = JSON.stringify(this.cfg.mappings);
     const maps = buildMaps(this.cfg.mappings);
     this.byChannel = maps.byChannel;
     this.bySource = maps.bySource;
@@ -43,7 +45,14 @@ export class SyncEngine {
     this.lastResolve = 0;
     this.resolving = null;
 
-    goxlr.on('ready', () => this.pushFullState());
+    goxlr.on('ready', (snap) => {
+      this.activeProfile = snap.profileName ?? null;
+      this.refreshActive({ push: false }).finally(() => this.pushFullState());
+    });
+    goxlr.on('profile', (name) => {
+      this.activeProfile = name ?? null;
+      this.refreshActive();
+    });
     goxlr.on('volume', (ch, v) => this.onVolume(ch, v));
     goxlr.on('mute', (ch, list) => this.onMute(ch, list));
     slobs.on('connected', async () => {
@@ -65,17 +74,40 @@ export class SyncEngine {
     return this.cfg.twoWay !== false;
   }
 
+  // The mapping set in effect: the GoXLR profile's dedicated set when one
+  // exists, the default set otherwise.
+  activeSet() {
+    return (this.activeProfile && this.cfg.profiles?.[this.activeProfile]) || this.cfg.mappings;
+  }
+
+  usingDedicatedSet() {
+    return !!(this.activeProfile && this.cfg.profiles?.[this.activeProfile]);
+  }
+
+  async refreshActive({ push = true } = {}) {
+    const set = this.activeSet();
+    const key = JSON.stringify(set);
+    if (key === this.activeKey) return;
+    this.activeKey = key;
+    const maps = buildMaps(set);
+    this.byChannel = maps.byChannel;
+    this.bySource = maps.bySource;
+    this.resourceIds.clear();
+    this.log.ok(
+      `[sync] ${this.usingDedicatedSet() ? `Mappings of GoXLR profile "${this.activeProfile}"` : 'Default mappings'} applied (${set.length} mapping(s))`
+    );
+    this.lastResolve = 0;
+    await this.resolveSources(true);
+    if (push) this.pushFullState();
+  }
+
   // Hot-applies settings edited from the dashboard (no restart needed).
   async applySettings({ mappings, muteMode, twoWay } = {}) {
-    if (Array.isArray(mappings)) {
-      this.cfg.mappings = mappings;
-      const maps = buildMaps(mappings);
-      this.byChannel = maps.byChannel;
-      this.bySource = maps.bySource;
-      this.resourceIds.clear();
-    }
+    if (Array.isArray(mappings)) this.cfg.mappings = mappings;
     if (muteMode) this.cfg.muteMode = muteMode;
     if (typeof twoWay === 'boolean') this.cfg.twoWay = twoWay;
+    this.activeKey = null; // force rebuild
+    await this.refreshActive({ push: false });
     this.lastResolve = 0;
     await this.resolveSources(true);
     this.pushFullState();
@@ -116,7 +148,7 @@ export class SyncEngine {
         const byName = new Map(sources.map((s) => [s.name, s.resourceId]));
         this.sourceIdToName = new Map(sources.map((s) => [s.sourceId, s.name]));
         for (const s of sources) this.slobsMuted.set(s.name, !!s.muted);
-        const wanted = new Set(this.cfg.mappings.map((m) => m.source));
+        const wanted = new Set(this.activeSet().map((m) => m.source));
         let okCount = 0;
         for (const name of wanted) {
           const rid = byName.get(name) ?? null;

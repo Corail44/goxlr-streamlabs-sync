@@ -17,6 +17,8 @@ jobs:
         run: |
           node src/index.js --help
           node src/index.js --version
+      - name: Unit tests
+        run: npm test
 
   # The exe build only runs on main: dev pushes stay fast and cheap.
   build-exe:

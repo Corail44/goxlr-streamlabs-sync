@@ -21,6 +21,10 @@ Des outils équivalents existent pour OBS Studio ([goxlr-obs-fader-sync](https:/
 - **Compatible submixes** : quand le Broadcast Mix écoute le Mix B, les volumes submix sont utilisés dans les deux sens (badge MIX B dans le dashboard)
 - Sync des mutes avec logique "stream" : la source n'est mutée que si le mute GoXLR affecte réellement le stream (configurable)
 - Badges MUTE cliquables sur les strips du dashboard : coupe la source Streamlabs de n'importe quel canal mappé, même sans fader physique
+- Jeux de mappings dédiés par **profil GoXLR** : charge un profil sur la carte, les mappings correspondants s'appliquent automatiquement
+- Badges LIVE / REC alimentés par Streamlabs, avec confirmation renforcée si tu quittes pendant un live
+- Télécommande téléphone : active *Accès réseau local* dans les réglages et ouvre le dashboard depuis n'importe quel appareil du réseau
+- Notifications Windows natives (mise à jour disponible, connexion perdue) et rapport de diagnostic en un clic pour les issues
 - Chaque canal GoXLR peut être mappé vers une ou plusieurs sources Streamlabs
 - Compatible GoXLR Full et Mini, multi-appareils
 - Zéro dépendance npm, un seul petit process Node.js, reconnexion automatique des deux côtés
@@ -144,6 +148,8 @@ Avec un token configuré, `auto` essaie le pipe puis bascule tout seul sur le we
 | `sync.curveExponent` | `1.0` | `deflection = (volume/255)^exposant`. `1.0` = le slider suit la position du fader |
 | `sync.muteMode` | `follow_stream` | Voir ci-dessous |
 | `sync.twoWay` | `true` | Les sliders Streamlabs pilotent le GoXLR en retour (faders motorisés) |
+| `sync.profiles` | `{}` | Jeux de mappings dédiés par nom de profil GoXLR (gérés depuis le dashboard) |
+| `ui.notifications` | `true` | Notifications Windows (mise à jour disponible, connexion perdue) |
 | `sync.syncOnConnect` | `true` | Pousse l'état complet du GoXLR vers Streamlabs à la (re)connexion |
 | `sync.mappings[]` | - | `{ channel, source, syncVolume?, syncMute? }` |
 | `ui.enabled` | `true` | Sert le dashboard web local |

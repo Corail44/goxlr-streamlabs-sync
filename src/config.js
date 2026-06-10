@@ -40,6 +40,7 @@ const DEFAULTS = {
     syncOnConnect: true,
     twoWay: true,
     mappings: [],
+    profiles: {},
   },
   ui: {
     enabled: true,
@@ -47,6 +48,7 @@ const DEFAULTS = {
     port: 14571,
     openBrowser: false,
     tray: true,
+    notifications: true,
   },
   updateCheck: true,
 };
@@ -80,17 +82,27 @@ export function saveConfigFile(file, cfg) {
   fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + '\n');
 }
 
-export function validateConfig(cfg) {
-  const s = cfg.sync;
-  if (!Array.isArray(s.mappings)) throw new Error('config: sync.mappings must be an array');
-  for (const m of s.mappings) {
-    if (!m || typeof m !== 'object') throw new Error('config: each mapping must be an object');
+function validateMappings(mappings, label) {
+  if (!Array.isArray(mappings)) throw new Error(`config: ${label} must be an array`);
+  for (const m of mappings) {
+    if (!m || typeof m !== 'object') throw new Error(`config: each mapping in ${label} must be an object`);
     if (!CHANNELS.includes(m.channel)) {
-      throw new Error(`config: unknown channel "${m.channel}". Valid channels: ${CHANNELS.join(', ')}`);
+      throw new Error(`config: unknown channel "${m.channel}" in ${label}. Valid channels: ${CHANNELS.join(', ')}`);
     }
     if (typeof m.source !== 'string' || !m.source.trim()) {
-      throw new Error(`config: mapping for channel "${m.channel}" needs a non-empty "source" name`);
+      throw new Error(`config: mapping for channel "${m.channel}" in ${label} needs a non-empty "source" name`);
     }
+  }
+}
+
+export function validateConfig(cfg) {
+  const s = cfg.sync;
+  validateMappings(s.mappings, 'sync.mappings');
+  if (s.profiles == null || typeof s.profiles !== 'object' || Array.isArray(s.profiles)) {
+    throw new Error('config: sync.profiles must be an object (GoXLR profile name -> mappings array)');
+  }
+  for (const [name, set] of Object.entries(s.profiles)) {
+    validateMappings(set, `sync.profiles["${name}"]`);
   }
   if (!MUTE_MODES.includes(s.muteMode)) {
     throw new Error(`config: sync.muteMode must be one of: ${MUTE_MODES.join(', ')}`);
@@ -107,8 +119,13 @@ export function validateConfig(cfg) {
   if (!TRANSPORTS.includes(cfg.streamlabs.transport)) {
     throw new Error(`config: streamlabs.transport must be one of: ${TRANSPORTS.join(', ')}`);
   }
-  if (typeof cfg.ui.enabled !== 'boolean' || typeof cfg.ui.openBrowser !== 'boolean' || typeof cfg.ui.tray !== 'boolean') {
-    throw new Error('config: ui.enabled, ui.openBrowser and ui.tray must be booleans');
+  if (
+    typeof cfg.ui.enabled !== 'boolean' ||
+    typeof cfg.ui.openBrowser !== 'boolean' ||
+    typeof cfg.ui.tray !== 'boolean' ||
+    typeof cfg.ui.notifications !== 'boolean'
+  ) {
+    throw new Error('config: ui.enabled, ui.openBrowser, ui.tray and ui.notifications must be booleans');
   }
   if (!Number.isInteger(cfg.ui.port) || cfg.ui.port < 1 || cfg.ui.port > 65535) {
     throw new Error('config: ui.port must be an integer between 1 and 65535');

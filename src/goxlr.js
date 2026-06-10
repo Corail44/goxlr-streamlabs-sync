@@ -159,6 +159,10 @@ export class GoXLRClient extends EventEmitter {
       return;
     }
 
+    if (prev.profileName !== snap.profileName) {
+      this.log.info(`[goxlr] Profile loaded: ${snap.profileName}`);
+      this.emit('profile', snap.profileName);
+    }
     if (prev.submixActive !== snap.submixActive) {
       this.log.info(`[goxlr] Stream mix source: ${snap.submixActive ? 'Mix B (submix volumes)' : 'Mix A (main volumes)'}`);
       this.emit('submix', snap.submixActive);
@@ -200,7 +204,7 @@ export class GoXLRClient extends EventEmitter {
     }
     const cough = m?.cough_button;
     if (cough) add('Mic', cough.state, cough.mute_type);
-    return { volumes, mutes, submixActive };
+    return { volumes, mutes, submixActive, profileName: m?.profile_name ?? null };
   }
 
   get snapshotNow() {

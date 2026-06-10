@@ -10,6 +10,7 @@
   "scripts": {
     "start": "node src/index.js",
     "list": "node src/index.js --list",
+    "test": "node --test \"tests/unit/*.test.mjs\"",
     "make:icon": "node scripts/make-icon.mjs",
     "build:exe": "node scripts/build-exe.mjs"
   },
