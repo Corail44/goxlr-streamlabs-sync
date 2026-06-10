@@ -4,7 +4,7 @@
 
 🇬🇧 [English version](README.md)
 
-Le GoXLR n'expose qu'UN seul périphérique de capture mixé à Windows (*Broadcast Stream Mix*) : ton stream/enregistrement reçoit tout mélangé, impossible de retravailler la voix, le jeu et la musique séparément au montage. L'astuce connue consiste à capturer chaque périphérique de lecture GoXLR (Game, Music, Chat, System) comme source *Capture de sortie audio* dans Streamlabs Desktop et à les enregistrer sur des pistes séparées. Problème : ces captures sont prises **avant** le mixage matériel du GoXLR — tes faders et boutons mute n'ont plus aucun effet dessus.
+Le GoXLR n'expose qu'UN seul périphérique de capture mixé à Windows (*Broadcast Stream Mix*) : ton stream/enregistrement reçoit tout mélangé, impossible de retravailler la voix, le jeu et la musique séparément au montage. L'astuce connue consiste à capturer chaque périphérique de lecture GoXLR (Game, Music, Chat, System) comme source *Capture de sortie audio* dans Streamlabs Desktop et à les enregistrer sur des pistes séparées. Problème : ces captures sont prises **avant** le mixage matériel du GoXLR - tes faders et boutons mute n'ont plus aucun effet dessus.
 
 Cet outil corrige ça : il écoute l'API websocket du [GoXLR Utility](https://github.com/GoXLR-on-Linux/goxlr-utility) et réplique en temps réel chaque mouvement de fader et chaque mute sur tes sources audio Streamlabs Desktop, via l'API JSON-RPC de Streamlabs.
 
@@ -12,7 +12,7 @@ Cet outil corrige ça : il écoute l'API websocket du [GoXLR Utility](https://gi
 GoXLR ──USB──> daemon GoXLR Utility ──websocket──> goxlr-streamlabs-sync ──JSON-RPC──> Streamlabs Desktop
 ```
 
-Des outils équivalents existent pour OBS Studio ([goxlr-obs-fader-sync](https://github.com/FrostyCoolSlug/goxlr-obs-fader-sync), [obs-goxlr-fader-sync-plugin](https://github.com/parzival-space/obs-goxlr-fader-sync-plugin)) — celui-ci est pour **Streamlabs Desktop**.
+Des outils équivalents existent pour OBS Studio ([goxlr-obs-fader-sync](https://github.com/FrostyCoolSlug/goxlr-obs-fader-sync), [obs-goxlr-fader-sync-plugin](https://github.com/parzival-space/obs-goxlr-fader-sync-plugin)) - celui-ci est pour **Streamlabs Desktop**.
 
 ## Fonctionnalités
 
@@ -21,8 +21,8 @@ Des outils équivalents existent pour OBS Studio ([goxlr-obs-fader-sync](https:/
 - Chaque canal GoXLR peut être mappé vers une ou plusieurs sources Streamlabs
 - Compatible GoXLR Full et Mini, multi-appareils
 - Zéro dépendance npm, un seul petit process Node.js, reconnexion automatique des deux côtés
-- Dashboard web local (volumes en direct, mutes, logs) et **icône dans la zone de notification** — rien qui traîne dans ta barre des tâches
-- **Tout se configure depuis le dashboard** : éditeur de mappings (qui propose tes sources Streamlabs en direct), comportement des mutes, interrupteur *Démarrer avec Windows* — appliqué instantanément, sans redémarrage
+- Dashboard web local (volumes en direct, mutes, logs) et **icône dans la zone de notification** - rien qui traîne dans ta barre des tâches
+- **Tout se configure depuis le dashboard** : éditeur de mappings (qui propose tes sources Streamlabs en direct), comportement des mutes, interrupteur *Démarrer avec Windows* - appliqué instantanément, sans redémarrage
 - **`.exe` autonome** disponible (aucune installation de Node.js), compilé en toute transparence par GitHub Actions
 - Notification de mise à jour (vérifie les releases GitHub une fois par jour, désactivable)
 - Mode `--list` pour découvrir tes canaux et les noms exacts de tes sources
@@ -36,13 +36,13 @@ Des outils équivalents existent pour OBS Studio ([goxlr-obs-fader-sync](https:/
 
 ## Installation
 
-### Option A — exécutable autonome (le plus simple)
+### Option A - exécutable autonome (le plus simple)
 
-Télécharge `goxlr-streamlabs-sync.exe` depuis la [page Releases](../../releases), mets-le dans un dossier à lui, et lance-le. Au premier lancement il crée un `config.json` à côté de l'exe — édite les mappings, relance, c'est fini. Aucune installation de Node.js.
+Télécharge `goxlr-streamlabs-sync.exe` depuis la [page Releases](../../releases), mets-le dans un dossier à lui, et lance-le. Au premier lancement il crée un `config.json` à côté de l'exe - édite les mappings, relance, c'est fini. Aucune installation de Node.js.
 
 > **À propos de Windows SmartScreen :** l'exe n'est pas signé numériquement (les certificats coûtent cher pour un outil communautaire gratuit), donc le premier lancement peut afficher *« Windows a protégé votre ordinateur »* → clique *Informations complémentaires* → *Exécuter quand même*. Chaque release est compilée **en toute transparence depuis le code source de ce dépôt** par GitHub Actions, avec le hash SHA256 publié à côté (`SHA256SUMS.txt`). En cas de doute, audite le code et compile-le toi-même (Option C).
 
-### Option B — depuis les sources
+### Option B - depuis les sources
 
 ```
 git clone https://github.com/Corail44/goxlr-streamlabs-sync.git
@@ -51,7 +51,7 @@ cd goxlr-streamlabs-sync
 
 Nécessite [Node.js 22+](https://nodejs.org/). Rien à compiler, pas de `npm install`.
 
-### Option C — compiler l'exe toi-même
+### Option C - compiler l'exe toi-même
 
 ```
 npm install
@@ -76,7 +76,7 @@ Puis dans **Paramètres → Sortie (mode Avancé) → Enregistrement** : passe l
 
 ### 2. Configurer la sync
 
-**Le plus simple :** ouvre le dashboard (http://127.0.0.1:14571) → **⚙️ Réglages** → associe chaque canal GoXLR à une source Streamlabs (le champ propose tes sources en direct), choisis le comportement des mutes, active *Démarrer avec Windows* si tu veux — puis **Enregistrer**. C'est appliqué instantanément, sans redémarrage.
+**Le plus simple :** ouvre le dashboard (http://127.0.0.1:14571), clique sur **Réglages**, puis associe chaque canal GoXLR à une source Streamlabs (le champ propose tes sources en direct), choisis le comportement des mutes, active *Démarrer avec Windows* si tu veux et colle ton token API Streamlabs, puis **Enregistrer**. C'est appliqué instantanément, sans redémarrage.
 
 **Par fichier :** édite `config.json` (pars de `config.example.json`) :
 
@@ -100,25 +100,25 @@ Canaux valides : `Mic`, `LineIn`, `Console`, `System`, `Game`, `Chat`, `Sample`,
 
 Une **icône apparaît dans la zone de notification** : clic droit pour *Ouvrir le dashboard* / *Quitter*, double-clic pour ouvrir le dashboard.
 
-- **Exe autonome :** lance simplement `goxlr-streamlabs-sync.exe` — il file directement en arrière-plan (icône de notification, aucune fenêtre console). Utilise `--console` pour le garder attaché à un terminal et voir les logs.
+- **Exe autonome :** lance simplement `goxlr-streamlabs-sync.exe` - il file directement en arrière-plan (icône de notification, aucune fenêtre console). Utilise `--console` pour le garder attaché à un terminal et voir les logs.
 - **Depuis les sources, sans fenêtre :** double-clique sur **`start-hidden.vbs`**.
 - **Depuis les sources, avec console :** `start.bat` ou `npm start`.
 
 Relancer alors que c'est déjà lancé rouvre simplement le dashboard (instance unique). Pour arrêter : l'icône de notification, le bouton *Quitter* du dashboard, ou `stop.bat`.
 
-Bouge un fader sur le GoXLR — le slider Streamlabs correspondant suit. 🎚️
+Bouge un fader sur le GoXLR - le slider Streamlabs correspondant suit. 🎚️
 
 Pour le lancer automatiquement avec Windows : active **Démarrer avec Windows** dans les réglages du dashboard (ça enregistre la bonne commande dans `HKCU\...\Run`).
 
 ### Le dashboard
 
-L'outil sert une petite page web locale (aucun service externe, aucune dépendance) : état des deux connexions, volumes des canaux en temps réel, mutes, sources mappées et logs récents — plus un bouton *Quitter*. Adresse par défaut : **http://127.0.0.1:14571**. Mets `ui.host` à `"0.0.0.0"` pour y accéder depuis un autre appareil de ton réseau. Fermer l'onglet n'arrête jamais la sync.
+L'outil sert une petite page web locale (aucun service externe, aucune dépendance) : état des deux connexions, volumes des canaux en temps réel, mutes, sources mappées et logs récents - plus un bouton *Quitter*. Adresse par défaut : **http://127.0.0.1:14571**. Mets `ui.host` à `"0.0.0.0"` pour y accéder depuis un autre appareil de ton réseau. Fermer l'onglet n'arrête jamais la sync.
 
-La langue de l'interface suit ton navigateur (français/anglais) et peut être forcée avec le **sélecteur 🌐** de l'en-tête — le choix est mémorisé par navigateur. Ajouter une langue est une petite PR : un bloc de dictionnaire dans `src/ui.html`.
+La langue de l'interface suit ton navigateur (français/anglais) et peut être forcée avec le sélecteur de langue de l'en-tête ; le choix est mémorisé par navigateur. Ajouter une langue est une petite PR : un bloc de dictionnaire dans `src/ui.html`.
 
 ## Connexion à Streamlabs : pipe ou websocket
 
-Par défaut (`"transport": "auto"`), l'outil se connecte via le **named pipe** local de Streamlabs (`\\.\pipe\slobs`) — aucune configuration.
+Par défaut (`"transport": "auto"`), l'outil se connecte via le **named pipe** local de Streamlabs (`\\.\pipe\slobs`) - aucune configuration.
 
 **Particularité connue de Streamlabs :** le listener du pipe est à usage unique. Si un client se déconnecte (ex. tu arrêtes l'outil), Streamlabs ne recrée pas le pipe avant son redémarrage. Si tu relances la sync alors que Streamlabs est resté ouvert, le pipe sera indisponible. Deux options :
 
@@ -141,7 +141,7 @@ Avec un token configuré, `auto` essaie le pipe puis bascule tout seul sur le we
 | `sync.curveExponent` | `1.0` | `deflection = (volume/255)^exposant`. `1.0` = le slider suit la position du fader |
 | `sync.muteMode` | `follow_stream` | Voir ci-dessous |
 | `sync.syncOnConnect` | `true` | Pousse l'état complet du GoXLR vers Streamlabs à la (re)connexion |
-| `sync.mappings[]` | — | `{ channel, source, syncVolume?, syncMute? }` |
+| `sync.mappings[]` | - | `{ channel, source, syncVolume?, syncMute? }` |
 | `ui.enabled` | `true` | Sert le dashboard web local |
 | `ui.host` | `127.0.0.1` | Adresse d'écoute du dashboard (`0.0.0.0` pour l'accès LAN) |
 | `ui.port` | `14571` | Port du dashboard (sert aussi de verrou d'instance unique) |
@@ -151,9 +151,9 @@ Avec un token configuré, `auto` essaie le pipe puis bascule tout seul sur le we
 
 ### Modes de mute
 
-Le bouton mute du GoXLR peut cibler différentes sorties (mute vers All / Stream / Voice Chat / Phones / Line Out — et l'appui long mute partout).
+Le bouton mute du GoXLR peut cibler différentes sorties (mute vers All / Stream / Voice Chat / Phones / Line Out - et l'appui long mute partout).
 
-- `follow_stream` (défaut) : la source Streamlabs n'est mutée que si le mute GoXLR affecte le mix du stream (`MutedToAll`, ou `MutedToX` avec cible `All`/`ToStream`). Un mute "vers le casque" ne mutera pas ton enregistrement — c'est généralement ce qu'on veut.
+- `follow_stream` (défaut) : la source Streamlabs n'est mutée que si le mute GoXLR affecte le mix du stream (`MutedToAll`, ou `MutedToX` avec cible `All`/`ToStream`). Un mute "vers le casque" ne mutera pas ton enregistrement - c'est généralement ce qu'on veut.
 - `any` : n'importe quel état de mute sur le canal mute la source.
 - `off` : ne touche jamais aux mutes.
 
@@ -162,14 +162,14 @@ Le **bouton cough** du micro est géré aussi (compté comme un mute du canal `M
 ## Limitations
 
 - Sync à sens unique (GoXLR → Streamlabs). Bouger un slider dans Streamlabs ne bouge pas le fader motorisé.
-- Les **submixes** GoXLR ne sont pas encore gérés — c'est le volume principal du canal qui est utilisé.
+- Les **submixes** GoXLR ne sont pas encore gérés - c'est le volume principal du canal qui est utilisé.
 - Les canaux sans fader assigné synchronisent quand même leur volume (changé via l'interface de l'Utility), mais n'ont pas de bouton mute à synchroniser.
 
 ## Dépannage
 
-- **`GoXLR Utility unreachable`** — vérifie que le daemon [GoXLR Utility](https://github.com/GoXLR-on-Linux/goxlr-utility) tourne (icône dans la zone de notification). L'app officielle GoXLR ne doit pas tourner en même temps.
-- **`Cannot reach Streamlabs Desktop`** — Streamlabs n'est pas lancé, ou son pipe est mort (voir [pipe ou websocket](#connexion-à-streamlabs--pipe-ou-websocket)).
-- **`Sources not found in Streamlabs`** — les noms `source` du `config.json` doivent correspondre exactement aux noms des sources Streamlabs (sensible à la casse). Lance `node src/index.js --list`.
+- **`GoXLR Utility unreachable`** - vérifie que le daemon [GoXLR Utility](https://github.com/GoXLR-on-Linux/goxlr-utility) tourne (icône dans la zone de notification). L'app officielle GoXLR ne doit pas tourner en même temps.
+- **`Cannot reach Streamlabs Desktop`** - Streamlabs n'est pas lancé, ou son pipe est mort (voir [pipe ou websocket](#connexion-à-streamlabs--pipe-ou-websocket)).
+- **`Sources not found in Streamlabs`** - les noms `source` du `config.json` doivent correspondre exactement aux noms des sources Streamlabs (sensible à la casse). Lance `node src/index.js --list`.
 - Lance avec `--verbose` pour voir chaque patch et appel API, et `--dry-run` pour tester sans toucher à Streamlabs.
 
 ## Contribuer
@@ -187,7 +187,7 @@ src/jsonpatch.js   implémentation minimale de RFC 6902
 
 ## Crédits
 
-- [GoXLR-on-Linux / goxlr-utility](https://github.com/GoXLR-on-Linux/goxlr-utility) — le projet communautaire qui rend tout ça possible
+- [GoXLR-on-Linux / goxlr-utility](https://github.com/GoXLR-on-Linux/goxlr-utility) - le projet communautaire qui rend tout ça possible
 - Inspiré par [goxlr-obs-fader-sync](https://github.com/FrostyCoolSlug/goxlr-obs-fader-sync) et [obs-goxlr-fader-sync-plugin](https://github.com/parzival-space/obs-goxlr-fader-sync-plugin) (équivalents OBS Studio)
 
 ## Licence

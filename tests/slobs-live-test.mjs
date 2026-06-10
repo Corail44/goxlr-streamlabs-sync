@@ -18,7 +18,7 @@ const slobs = new StreamlabsClient({
 });
 
 function fail(msg) {
-  logger.error(`FAIL — ${msg}`);
+  logger.error(`FAIL - ${msg}`);
   slobs.close();
   process.exit(1);
 }
@@ -69,6 +69,6 @@ t1 = await readBack();
 if (!!t1?.muted !== m0) fail(`muted state changed (expected ${m0}, got ${t1?.muted})`);
 logger.ok(`setMuted(${m0}) no-op verified`);
 
-logger.ok('PASS — Streamlabs write path works (setDeflection + setMuted)');
+logger.ok('PASS - Streamlabs write path works (setDeflection + setMuted)');
 slobs.close();
 process.exit(0);

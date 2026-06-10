@@ -10,7 +10,7 @@ const BACKOFF_MAX = 15000;
 //   - Websocket  ws://127.0.0.1:59650/api (SockJS, requires the API token from
 //     Settings -> Remote Control)
 //
-// Note: Streamlabs' named pipe listener is single-shot — once a client
+// Note: Streamlabs' named pipe listener is single-shot - once a client
 // disconnects, the pipe is gone until Streamlabs Desktop restarts. This client
 // therefore keeps one persistent connection and reconnects with backoff.
 export class StreamlabsClient extends EventEmitter {
@@ -192,7 +192,7 @@ export class StreamlabsClient extends EventEmitter {
         await this.call('auth', 'TcpServerService', [this.token]);
         this.log.ok('[streamlabs] Authenticated');
       } catch (e) {
-        this.log.error(`[streamlabs] Auth failed: ${e.message} — check streamlabs.token in config.json`);
+        this.log.error(`[streamlabs] Auth failed: ${e.message} - check streamlabs.token in config.json`);
         try {
           this.ws.close();
         } catch {}

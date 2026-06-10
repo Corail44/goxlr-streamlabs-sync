@@ -35,7 +35,7 @@ export async function setAutostart(enabled) {
   const command = autostartCommand();
   await run('reg', ['add', KEY, '/v', NAME, '/t', 'REG_SZ', '/d', command, '/f']);
   const warning = /\\Temp\\/i.test(process.execPath)
-    ? 'The executable is running from a temporary folder — move it somewhere permanent, run it again and re-enable autostart.'
+    ? 'The executable is running from a temporary folder - move it somewhere permanent, run it again and re-enable autostart.'
     : null;
   return { enabled: true, command, warning };
 }

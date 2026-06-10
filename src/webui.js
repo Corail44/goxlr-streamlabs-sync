@@ -53,7 +53,7 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       device: goxlr.status?.mixers?.[goxlr.serial]?.hardware?.device_type ?? null,
     },
     streamlabs: { connected: slobs.connected, mode: slobs.connected ? slobs.mode : null },
-    settings: { muteMode: cfg.sync.muteMode, mappings: cfg.sync.mappings },
+    settings: { muteMode: cfg.sync.muteMode, mappings: cfg.sync.mappings, hasToken: !!cfg.streamlabs.token },
     channels: [...engine.byChannel.entries()].map(([ch, maps]) => ({
       channel: ch,
       volume: goxlr.snapshotNow?.volumes?.[ch] ?? null,
@@ -115,6 +115,8 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       }));
     }
     if (typeof body.muteMode === 'string') next.sync.muteMode = body.muteMode;
+    const newToken = typeof body.token === 'string' ? body.token.trim() : '';
+    if (newToken) next.streamlabs.token = newToken;
 
     try {
       validateConfig(next);
@@ -130,6 +132,10 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       return json(res, 500, { error: `could not write ${target}: ${e.message}` });
     }
 
+    if (newToken) {
+      cfg.streamlabs.token = newToken;
+      slobs.token = newToken; // used on the next (re)connection
+    }
     await engine.applySettings({ mappings: next.sync.mappings, muteMode: next.sync.muteMode });
     logger.ok(`[ui] Settings saved to ${target}`);
     pushState();

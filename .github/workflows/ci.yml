@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
 
 jobs:
@@ -17,7 +17,15 @@ jobs:
         run: |
           node src/index.js --help
           node src/index.js --version
-      - name: Build the standalone exe
-        run: |
-          npm ci
-          npm run build:exe
+
+  # The exe build only runs on main: dev pushes stay fast and cheap.
+  build-exe:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run build:exe

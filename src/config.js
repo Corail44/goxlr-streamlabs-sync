@@ -62,7 +62,7 @@ export function defaultConfig() {
   return JSON.parse(JSON.stringify(DEFAULTS));
 }
 
-// Stable per-user folder — survives wherever the exe is launched from
+// Stable per-user folder - survives wherever the exe is launched from
 // (browser temp folders, Downloads, USB sticks...).
 export function appDataDir() {
   const base = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');

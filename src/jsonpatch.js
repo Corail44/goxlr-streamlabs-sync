@@ -1,4 +1,4 @@
-// Minimal RFC 6902 (JSON Patch) implementation — enough to mirror the
+// Minimal RFC 6902 (JSON Patch) implementation - enough to mirror the
 // GoXLR Utility daemon status object from its websocket patch stream.
 
 function unescapeToken(t) {

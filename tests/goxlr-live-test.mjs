@@ -62,12 +62,12 @@ try {
   await p2;
   logger.ok(`Event received: Music=${original} (restored)`);
 
-  logger.ok('PASS — patch stream and volume events work end-to-end');
+  logger.ok('PASS - patch stream and volume events work end-to-end');
   process.exitCode = 0;
 } catch (e) {
   // Best-effort restore even on failure
   sendCommand(cmd, client.serial, { SetVolume: ['Music', original] });
-  logger.error(`FAIL — ${e.message}`);
+  logger.error(`FAIL - ${e.message}`);
   process.exitCode = 1;
 } finally {
   setTimeout(() => {

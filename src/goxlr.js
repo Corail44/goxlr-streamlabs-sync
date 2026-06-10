@@ -4,9 +4,9 @@ import { applyPatch } from './jsonpatch.js';
 // Client for the GoXLR Utility daemon websocket (https://github.com/GoXLR-on-Linux/goxlr-utility).
 // Mirrors the full DaemonStatus locally by applying the JSON Patch stream, then
 // emits high-level events:
-//   'ready'  (snapshot)                    — first full status received
-//   'volume' (channel, value 0-255)        — a channel volume changed
-//   'mute'   (channel, [{state, func}])    — active mute entries for a channel changed
+//   'ready'  (snapshot)                    - first full status received
+//   'volume' (channel, value 0-255)        - a channel volume changed
+//   'mute'   (channel, [{state, func}])    - active mute entries for a channel changed
 //   'disconnected'
 export class GoXLRClient extends EventEmitter {
   constructor({ url, serial = null, logger }) {

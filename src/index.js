@@ -118,7 +118,7 @@ async function listMode(cfg, log) {
       console.log(`  ${ch.padEnd(11)} volume=${String(snap.volumes[ch]).padStart(3)}${muteInfo}`);
     }
   } else {
-    log.error(`GoXLR Utility unreachable at ${cfg.goxlr.url} — is the utility running?`);
+    log.error(`GoXLR Utility unreachable at ${cfg.goxlr.url} - is the utility running?`);
   }
 
   console.log('\n=== Streamlabs audio sources ===');
@@ -154,7 +154,7 @@ async function main() {
   }
 
   // Packaged exe double-clicked with no arguments: don't keep a console
-  // window hostage — hand over to a detached background process.
+  // window hostage - hand over to a detached background process.
   if (IS_SEA && userArgs.length === 0) {
     relaunchDetached(['--console']);
     console.log('goxlr-streamlabs-sync: running in the background (tray icon / dashboard).');
@@ -174,15 +174,15 @@ async function main() {
   const { cfg, file, created } = loaded;
 
   logger.info(`goxlr-streamlabs-sync v${VERSION}${args.dryRun ? ' (dry-run)' : ''}`);
-  logger.info(`Config: ${file ?? '(defaults — no config.json yet)'}`);
+  logger.info(`Config: ${file ?? '(defaults - no config.json yet)'}`);
   if (created) {
-    logger.warn('A default config.json was created — open the dashboard to set up your mappings!');
+    logger.warn('A default config.json was created - open the dashboard to set up your mappings!');
   }
 
   if (args.list) return listMode(cfg, logger);
 
   if (!cfg.sync.mappings.length) {
-    logger.warn('No mappings configured yet — open the dashboard and add them in the Settings panel.');
+    logger.warn('No mappings configured yet - open the dashboard and add them in the Settings panel.');
   }
 
   const goxlr = new GoXLRClient({ ...cfg.goxlr, logger });
@@ -218,11 +218,11 @@ async function main() {
       });
     } catch (e) {
       if (e.code === 'EADDRINUSE') {
-        logger.warn(`Already running (dashboard port ${cfg.ui.port} is busy) — opening ${dashUrl} instead.`);
+        logger.warn(`Already running (dashboard port ${cfg.ui.port} is busy) - opening ${dashUrl} instead.`);
         openInBrowser(dashUrl, logger);
         process.exit(0);
       }
-      logger.warn(`[ui] Dashboard failed to start (${e.message}) — continuing without it.`);
+      logger.warn(`[ui] Dashboard failed to start (${e.message}) - continuing without it.`);
     }
     if (cfg.ui.tray && process.platform === 'win32') {
       startTray({ url: dashUrl, logger, onQuit: () => shutdown('tray') });
