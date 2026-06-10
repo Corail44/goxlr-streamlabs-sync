@@ -89,7 +89,10 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       slobsPort: parseSlobsUrl().port,
       twoWay: cfg.sync.twoWay !== false,
       notifications: cfg.ui.notifications !== false,
+      hasPin: !!cfg.ui.pin,
+      sceneRules: cfg.sync.sceneRules ?? {},
     },
+    snapshots: Object.keys(cfg.sync.snapshots ?? {}),
     live,
     lan: { enabled: cfg.ui.host === '0.0.0.0', urls: lanUrls() },
     profile: {
@@ -166,6 +169,40 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
     res.end(JSON.stringify(obj));
   };
 
+  const isLocal = (req) => {
+    const a = req.socket.remoteAddress ?? '';
+    return a === '127.0.0.1' || a === '::1' || a === '::ffff:127.0.0.1';
+  };
+
+  const hasAuthCookie = (req) =>
+    (req.headers.cookie ?? '').split(';').some((c) => c.trim() === `gss-auth=${cfg.ui.pin}`);
+
+  // Persists snapshot/scene-rule style changes while preserving the rest of
+  // the file and the live config object.
+  const persist = (mutate) => {
+    let raw = {};
+    if (cfgFile && fs.existsSync(cfgFile)) {
+      try {
+        raw = JSON.parse(fs.readFileSync(cfgFile, 'utf8'));
+      } catch {}
+    }
+    const next = mergeWithDefaults(raw);
+    next.streamlabs.token = next.streamlabs.token ?? cfg.streamlabs.token;
+    next.sync.profiles = { ...next.sync.profiles, ...cfg.sync.profiles };
+    next.sync.snapshots = { ...next.sync.snapshots, ...cfg.sync.snapshots };
+    next.sync.sceneRules = { ...next.sync.sceneRules, ...cfg.sync.sceneRules };
+    next.ui.pin = cfg.ui.pin;
+    mutate(next);
+    validateConfig(next);
+    const target = cfgFile ?? defaultConfigPath();
+    saveConfigFile(target, next);
+    cfgFile = target;
+    cfg.sync.snapshots = next.sync.snapshots;
+    cfg.sync.sceneRules = next.sync.sceneRules;
+    cfg.ui.pin = next.ui.pin;
+    return target;
+  };
+
   async function handleConfigSave(req, res) {
     let body;
     try {
@@ -216,6 +253,25 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       if (wanted !== cfg.ui.host) needsRestart = true;
       next.ui.host = wanted;
     }
+
+    // Remote access PIN: empty keeps it, OFF clears it, 4-8 digits sets it.
+    if (typeof body.pin === 'string' && body.pin.trim()) {
+      const pin = body.pin.trim();
+      if (/^off$/i.test(pin)) next.ui.pin = null;
+      else if (/^\d{4,8}$/.test(pin)) next.ui.pin = pin;
+      else return json(res, 400, { error: 'PIN must be 4-8 digits (or OFF to disable)' });
+    }
+
+    // Scene -> mix rules
+    if (body.sceneRules && typeof body.sceneRules === 'object' && !Array.isArray(body.sceneRules)) {
+      const rules = {};
+      for (const [scene, rule] of Object.entries(body.sceneRules)) {
+        const sc = String(scene).trim();
+        const snap = String(rule?.snapshot ?? '').trim();
+        if (sc && snap) rules[sc] = { snapshot: snap };
+      }
+      next.sync.sceneRules = rules;
+    }
     const newToken = typeof body.token === 'string' ? body.token.trim() : '';
     if (newToken) next.streamlabs.token = newToken;
 
@@ -255,7 +311,9 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       slobs.url = next.streamlabs.url.replace(/\/+$/, '');
     }
     cfg.sync.profiles = next.sync.profiles;
+    cfg.sync.sceneRules = next.sync.sceneRules;
     cfg.ui.notifications = next.ui.notifications;
+    cfg.ui.pin = next.ui.pin;
     await engine.applySettings({ mappings: next.sync.mappings, muteMode: next.sync.muteMode, twoWay: next.sync.twoWay });
     logger.ok(`[ui] Settings saved to ${target}`);
     pushState();
@@ -266,6 +324,28 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
     const url = (req.url ?? '/').split('?')[0];
 
     try {
+      // PIN gate for remote (non-localhost) clients. The page itself and the
+      // icon stay reachable so the browser can show the PIN screen.
+      if (cfg.ui.pin && !isLocal(req) && !hasAuthCookie(req)) {
+        if (req.method === 'POST' && url === '/api/login') {
+          let body = {};
+          try {
+            body = JSON.parse((await readBody(req)) || '{}');
+          } catch {}
+          if (String(body.pin ?? '') === String(cfg.ui.pin)) {
+            res.writeHead(200, {
+              'content-type': 'application/json',
+              'set-cookie': `gss-auth=${cfg.ui.pin}; Path=/; Max-Age=31536000; SameSite=Lax`,
+            });
+            return res.end('{"ok":true}');
+          }
+          return json(res, 401, { error: 'bad pin' });
+        }
+        if (!(req.method === 'GET' && (url === '/' || url === '/index.html' || url === '/icon.ico'))) {
+          return json(res, 401, { error: 'pin required' });
+        }
+      }
+
       if (req.method === 'GET' && (url === '/' || url === '/index.html')) {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
         res.end(html);
@@ -327,6 +407,51 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
         json(res, 200, { ok: true });
         logger.info('[ui] Restart requested from the dashboard.');
         setTimeout(onRestart, 250);
+      } else if (req.method === 'GET' && url === '/api/scenes') {
+        if (!slobs.connected) return json(res, 200, { scenes: [] });
+        try {
+          const scenes = await slobs.call('getScenes', 'ScenesService');
+          json(res, 200, { scenes: (scenes ?? []).map((s) => s.name).filter(Boolean) });
+        } catch (e) {
+          json(res, 200, { scenes: [], error: e.message });
+        }
+      } else if (req.method === 'POST' && url === '/api/snapshot') {
+        let body;
+        try {
+          body = JSON.parse(await readBody(req));
+        } catch {
+          return json(res, 400, { error: 'invalid JSON body' });
+        }
+        const name = String(body.name ?? '').trim();
+        if (!name) return json(res, 400, { error: 'missing snapshot name' });
+        try {
+          if (body.action === 'apply') {
+            engine.applySnapshot(name, typeof body.fadeMs === 'number' ? body.fadeMs : undefined);
+            json(res, 200, { ok: true });
+          } else if (body.action === 'save') {
+            const snap = engine.captureSnapshot();
+            persist((next) => {
+              next.sync.snapshots[name] = snap;
+            });
+            logger.ok(`[ui] Mix "${name}" saved (${Object.keys(snap.volumes).length} channel(s))`);
+            pushState();
+            json(res, 200, { ok: true });
+          } else if (body.action === 'delete') {
+            persist((next) => {
+              delete next.sync.snapshots[name];
+              for (const [scene, rule] of Object.entries(next.sync.sceneRules)) {
+                if (rule.snapshot === name) delete next.sync.sceneRules[scene];
+              }
+            });
+            logger.info(`[ui] Mix "${name}" deleted`);
+            pushState();
+            json(res, 200, { ok: true });
+          } else {
+            json(res, 400, { error: 'unknown action' });
+          }
+        } catch (e) {
+          json(res, 400, { error: e.message });
+        }
       } else if (req.method === 'POST' && url === '/api/channel-volume') {
         let body;
         try {

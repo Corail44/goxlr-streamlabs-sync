@@ -25,6 +25,9 @@ Des outils équivalents existent pour OBS Studio ([goxlr-obs-fader-sync](https:/
 - Badges LIVE / REC alimentés par Streamlabs, avec confirmation renforcée si tu quittes pendant un live
 - Télécommande téléphone : active *Accès réseau local* dans les réglages et ouvre le dashboard depuis n'importe quel appareil du réseau
 - Notifications Windows natives (mise à jour disponible, connexion perdue) et rapport de diagnostic en un clic pour les issues
+- **Snapshots de mix avec fondu** : enregistre des mixes nommés et rappelle-les d'un tap, les faders motorisés glissent en position
+- **Scènes automatiques** : passer sur une scène Streamlabs applique le mix associé tout seul
+- **PIN** optionnel protégeant l'accès réseau (jamais demandé sur le PC ; les appareils distants sont mémorisés)
 - Chaque canal GoXLR peut être mappé vers une ou plusieurs sources Streamlabs
 - Compatible GoXLR Full et Mini, multi-appareils
 - Zéro dépendance npm, un seul petit process Node.js, reconnexion automatique des deux côtés
@@ -149,6 +152,10 @@ Avec un token configuré, `auto` essaie le pipe puis bascule tout seul sur le we
 | `sync.muteMode` | `follow_stream` | Voir ci-dessous |
 | `sync.twoWay` | `true` | Les sliders Streamlabs pilotent le GoXLR en retour (faders motorisés) |
 | `sync.profiles` | `{}` | Jeux de mappings dédiés par nom de profil GoXLR (gérés depuis le dashboard) |
+| `sync.snapshots` | `{}` | Snapshots de mix nommés (volumes + mutes), gérés depuis la barre Mixes |
+| `sync.snapshotFadeMs` | `1200` | Durée du fondu à l'application d'un mix |
+| `sync.sceneRules` | `{}` | Nom de scène Streamlabs -> mix appliqué automatiquement |
+| `ui.pin` | `null` | PIN 4-8 chiffres exigé pour l'accès réseau (hors localhost) |
 | `ui.notifications` | `true` | Notifications Windows (mise à jour disponible, connexion perdue) |
 | `sync.syncOnConnect` | `true` | Pousse l'état complet du GoXLR vers Streamlabs à la (re)connexion |
 | `sync.mappings[]` | - | `{ channel, source, syncVolume?, syncMute? }` |

@@ -25,6 +25,9 @@ Similar tools exist for OBS Studio ([goxlr-obs-fader-sync](https://github.com/Fr
 - LIVE / REC badges fed by Streamlabs, with a stronger confirmation when quitting while live
 - Phone remote: enable *Local network access* in the settings and open the dashboard from any device on your network
 - Native Windows notifications (update available, connection lost) and a one-click diagnostic report for bug reports
+- **Mix snapshots with eased fades**: save named mixes and recall them in one tap, the motorized faders glide to position
+- **Scene automation**: switching to a Streamlabs scene applies the mapped mix automatically
+- Optional **PIN** protecting network access (localhost never asks; remote devices are remembered)
 - Any GoXLR channel can be mapped to any number of Streamlabs sources
 - Works with the GoXLR Full and GoXLR Mini, and with multiple devices
 - Zero npm dependencies, single small Node.js process, auto-reconnects to both ends
@@ -149,6 +152,10 @@ With a token configured, `auto` tries the pipe first and falls back to the webso
 | `sync.muteMode` | `follow_stream` | See below |
 | `sync.twoWay` | `true` | Streamlabs slider moves drive the GoXLR back (motorized faders) |
 | `sync.profiles` | `{}` | Dedicated mapping sets per GoXLR profile name (managed from the dashboard) |
+| `sync.snapshots` | `{}` | Named mix snapshots (volumes + mutes), managed from the dashboard Mixes bar |
+| `sync.snapshotFadeMs` | `1200` | Fade duration when applying a mix |
+| `sync.sceneRules` | `{}` | Streamlabs scene name -> mix applied automatically on switch |
+| `ui.pin` | `null` | 4-8 digit PIN required for network (non-localhost) access |
 | `ui.notifications` | `true` | Windows toast notifications (update available, connection lost) |
 | `sync.syncOnConnect` | `true` | Push the full GoXLR state to Streamlabs on (re)connect |
 | `sync.mappings[]` | - | `{ channel, source, syncVolume?, syncMute? }` |

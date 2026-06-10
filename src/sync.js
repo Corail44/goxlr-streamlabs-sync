@@ -63,10 +63,17 @@ export class SyncEngine {
       } catch (e) {
         this.log.warn(`[sync] Could not subscribe to Streamlabs audio updates: ${e.message} (two-way sync disabled for this session)`);
       }
+      try {
+        await this.slobs.call('sceneSwitched', 'ScenesService');
+        this.log.debug('[sync] Subscribed to Streamlabs scene switches');
+      } catch (e) {
+        this.log.debug(`[sync] Scene subscription failed: ${e.message}`);
+      }
       this.pushFullState();
     });
     slobs.on('apiEvent', (rid, data) => {
       if (rid === 'AudioService.audioSourceUpdated') this.onSlobsAudio(data);
+      else if (rid === 'ScenesService.sceneSwitched') this.onSceneSwitched(data);
     });
   }
 
@@ -326,6 +333,81 @@ export class SyncEngine {
   }
 
   // ---- Dashboard actions ---------------------------------------------------
+
+  // ---- Mix snapshots --------------------------------------------------------
+
+  // Captures the current effective volumes and source mute states of the
+  // mapped channels.
+  captureSnapshot() {
+    const volumes = {};
+    const muted = {};
+    for (const [ch, maps] of this.byChannel) {
+      const v = this.goxlr.snapshotNow?.volumes?.[ch];
+      if (typeof v === 'number') volumes[ch] = v;
+      muted[ch] = this.channelSourcesMuted(maps);
+    }
+    return { volumes, muted };
+  }
+
+  // Applies a named snapshot with an eased fade: the motorized faders (or
+  // submix volumes) glide to their targets, and the forward sync carries
+  // every step to Streamlabs.
+  applySnapshot(name, fadeMs) {
+    const snap = this.cfg.snapshots?.[name];
+    if (!snap) throw new Error(`unknown snapshot "${name}"`);
+    const dur = Math.max(0, typeof fadeMs === 'number' ? fadeMs : (this.cfg.snapshotFadeMs ?? 1200));
+
+    for (const [ch, m] of Object.entries(snap.muted ?? {})) {
+      if (this.byChannel.has(ch)) this.setSourcesMuted(ch, m).catch(() => {});
+    }
+
+    if (this.fadeTimer) {
+      clearInterval(this.fadeTimer);
+      this.fadeTimer = null;
+    }
+    const start = {};
+    const targets = {};
+    for (const [ch, v] of Object.entries(snap.volumes ?? {})) {
+      if (!this.byChannel.has(ch)) continue;
+      const cur = this.goxlr.snapshotNow?.volumes?.[ch];
+      if (typeof cur !== 'number') continue;
+      start[ch] = cur;
+      targets[ch] = Math.max(0, Math.min(255, Math.round(v)));
+    }
+    this.log.ok(`[sync] Applying mix "${name}"${dur ? ` (${dur} ms fade)` : ''}`);
+    const t0 = Date.now();
+    const step = () => {
+      const k = dur === 0 ? 1 : Math.min(1, (Date.now() - t0) / dur);
+      const e = k < 1 ? (1 - Math.cos(k * Math.PI)) / 2 : 1; // ease in-out
+      for (const ch of Object.keys(targets)) {
+        this.goxlr.setEffectiveVolume(ch, Math.round(start[ch] + (targets[ch] - start[ch]) * e));
+      }
+      if (k >= 1 && this.fadeTimer) {
+        clearInterval(this.fadeTimer);
+        this.fadeTimer = null;
+      }
+    };
+    step();
+    if (dur > 0) this.fadeTimer = setInterval(step, 50);
+  }
+
+  // Streamlabs scene change: apply the mapped snapshot, if any.
+  onSceneSwitched(scene) {
+    const name = scene?.name;
+    if (!name) return;
+    const rule = this.cfg.sceneRules?.[name];
+    if (!rule?.snapshot) return;
+    if (!this.cfg.snapshots?.[rule.snapshot]) {
+      this.log.warn(`[sync] Scene "${name}" points to unknown mix "${rule.snapshot}"`);
+      return;
+    }
+    this.log.info(`[sync] Scene "${name}": applying mix "${rule.snapshot}"`);
+    try {
+      this.applySnapshot(rule.snapshot);
+    } catch (e) {
+      this.log.warn(`[sync] Scene rule failed: ${e.message}`);
+    }
+  }
 
   // Sets a channel volume from the dashboard (touch faders). The GoXLR is
   // the master: the device change then flows to Streamlabs through the

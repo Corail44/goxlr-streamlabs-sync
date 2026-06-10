@@ -127,6 +127,57 @@ test('a dedicated profile set replaces the default mappings', async () => {
   assert.ok(engine.byChannel.has('Music'));
 });
 
+test('captureSnapshot reads the mapped channels', async () => {
+  const { goxlr, slobs } = makeMocks();
+  const engine = new SyncEngine({ goxlr, slobs, config: baseCfg(), logger: loggerStub });
+  slobs.emit('connected');
+  await sleep(30);
+  const snap = engine.captureSnapshot();
+  assert.equal(snap.volumes.Music, 100);
+  assert.equal(snap.muted.Music, false);
+});
+
+test('applySnapshot without fade jumps to the target and applies mutes', async () => {
+  const { goxlr, slobs } = makeMocks();
+  const cfg = baseCfg({ snapshots: { Pause: { volumes: { Music: 30 }, muted: { Music: true } } }, snapshotFadeMs: 0 });
+  const engine = new SyncEngine({ goxlr, slobs, config: cfg, logger: loggerStub });
+  slobs.emit('connected');
+  await sleep(30);
+  engine.applySnapshot('Pause');
+  await sleep(30);
+  assert.deepEqual(goxlr.calls.at(-1), ['Music', 30]);
+  assert.ok(slobs.muteCalls.some(([r, m]) => r === 'rid1' && m === true));
+});
+
+test('applySnapshot fades through intermediate values', async () => {
+  const { goxlr, slobs } = makeMocks();
+  goxlr.snapshotNow.volumes.Music = 0;
+  const cfg = baseCfg({ snapshots: { Up: { volumes: { Music: 200 } } } });
+  const engine = new SyncEngine({ goxlr, slobs, config: cfg, logger: loggerStub });
+  slobs.emit('connected');
+  await sleep(30);
+  goxlr.calls.length = 0;
+  engine.applySnapshot('Up', 200);
+  await sleep(380);
+  assert.ok(goxlr.calls.length > 2, 'several fade steps expected');
+  assert.deepEqual(goxlr.calls.at(-1), ['Music', 200]);
+});
+
+test('a Streamlabs scene switch applies the mapped mix', async () => {
+  const { goxlr, slobs } = makeMocks();
+  const cfg = baseCfg({
+    snapshots: { Calme: { volumes: { Music: 10 } } },
+    sceneRules: { Pause: { snapshot: 'Calme' } },
+    snapshotFadeMs: 0,
+  });
+  new SyncEngine({ goxlr, slobs, config: cfg, logger: loggerStub });
+  slobs.emit('connected');
+  await sleep(30);
+  slobs.emit('apiEvent', 'ScenesService.sceneSwitched', { name: 'Pause' });
+  await sleep(30);
+  assert.deepEqual(goxlr.calls.at(-1), ['Music', 10]);
+});
+
 test('isMuted honors the mute modes', () => {
   const { goxlr, slobs } = makeMocks();
   const engine = new SyncEngine({ goxlr, slobs, config: baseCfg(), logger: loggerStub });

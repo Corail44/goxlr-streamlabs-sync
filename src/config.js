@@ -41,6 +41,9 @@ const DEFAULTS = {
     twoWay: true,
     mappings: [],
     profiles: {},
+    snapshots: {},
+    snapshotFadeMs: 1200,
+    sceneRules: {},
   },
   ui: {
     enabled: true,
@@ -49,6 +52,7 @@ const DEFAULTS = {
     openBrowser: false,
     tray: true,
     notifications: true,
+    pin: null,
   },
   updateCheck: true,
 };
@@ -104,6 +108,31 @@ export function validateConfig(cfg) {
   for (const [name, set] of Object.entries(s.profiles)) {
     validateMappings(set, `sync.profiles["${name}"]`);
   }
+  if (s.snapshots == null || typeof s.snapshots !== 'object' || Array.isArray(s.snapshots)) {
+    throw new Error('config: sync.snapshots must be an object');
+  }
+  for (const [name, snap] of Object.entries(s.snapshots)) {
+    if (!snap || typeof snap !== 'object') throw new Error(`config: snapshot "${name}" must be an object`);
+    for (const [ch, v] of Object.entries(snap.volumes ?? {})) {
+      if (!CHANNELS.includes(ch)) throw new Error(`config: snapshot "${name}" has unknown channel "${ch}"`);
+      if (typeof v !== 'number' || v < 0 || v > 255) throw new Error(`config: snapshot "${name}" volume for ${ch} must be 0-255`);
+    }
+    for (const [ch, m] of Object.entries(snap.muted ?? {})) {
+      if (!CHANNELS.includes(ch)) throw new Error(`config: snapshot "${name}" has unknown channel "${ch}"`);
+      if (typeof m !== 'boolean') throw new Error(`config: snapshot "${name}" muted for ${ch} must be a boolean`);
+    }
+  }
+  if (typeof s.snapshotFadeMs !== 'number' || s.snapshotFadeMs < 0 || s.snapshotFadeMs > 30000) {
+    throw new Error('config: sync.snapshotFadeMs must be a number between 0 and 30000');
+  }
+  if (s.sceneRules == null || typeof s.sceneRules !== 'object' || Array.isArray(s.sceneRules)) {
+    throw new Error('config: sync.sceneRules must be an object (scene name -> { snapshot })');
+  }
+  for (const [scene, rule] of Object.entries(s.sceneRules)) {
+    if (!rule || typeof rule !== 'object' || typeof rule.snapshot !== 'string' || !rule.snapshot.trim()) {
+      throw new Error(`config: sceneRules["${scene}"] needs a "snapshot" name`);
+    }
+  }
   if (!MUTE_MODES.includes(s.muteMode)) {
     throw new Error(`config: sync.muteMode must be one of: ${MUTE_MODES.join(', ')}`);
   }
@@ -132,6 +161,9 @@ export function validateConfig(cfg) {
   }
   if (typeof cfg.ui.host !== 'string' || !cfg.ui.host.trim()) {
     throw new Error('config: ui.host must be a non-empty string');
+  }
+  if (cfg.ui.pin !== null && !(typeof cfg.ui.pin === 'string' && /^\d{4,8}$/.test(cfg.ui.pin))) {
+    throw new Error('config: ui.pin must be null or a 4-8 digit string');
   }
   if (typeof cfg.updateCheck !== 'boolean') {
     throw new Error('config: updateCheck must be a boolean');

@@ -112,6 +112,28 @@
           font: 12px/1.55 Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
   .lg-info { color: #8da3b5; } .lg-ok { color: var(--led); } .lg-warn { color: var(--amber); } .lg-error { color: var(--red); } .lg-debug { color: #57626d; }
 
+  /* Mix snapshot chips */
+  #mixbar { display: none; flex-wrap: wrap; gap: 8px; padding: 0 18px 4px; align-items: center; }
+  #mixbar .bar-label { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dim); margin-right: 4px; }
+  .mix-chip { display: inline-flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line);
+              border-radius: 4px; padding: 7px 12px; cursor: pointer; font: 600 12px "Segoe UI", sans-serif; color: var(--text); user-select: none; }
+  .mix-chip:hover { border-color: var(--led); color: var(--led); }
+  .mix-chip .del { color: var(--dim); font-size: 11px; padding: 0 2px; }
+  .mix-chip .del:hover { color: var(--red); }
+  .mix-chip.add { color: var(--dim); font-weight: 400; }
+  .mix-chip.add:hover { border-color: var(--led); color: var(--led); }
+
+  .rule-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+  .rule-row input { width: 200px; }
+  .rule-row select { width: 160px; }
+
+  /* PIN gate */
+  #pin-gate { position: fixed; inset: 0; background: var(--bg); display: none; align-items: center; justify-content: center; }
+  #pin-gate.show { display: flex; }
+  #pin-gate .box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 28px 32px; text-align: center; }
+  #pin-gate input { font: 600 22px Consolas, monospace; letter-spacing: 6px; text-align: center; width: 190px; margin: 14px 0; }
+  #pin-gate .err { color: var(--red); font-size: 13px; min-height: 18px; margin-top: 8px; }
+
   footer { padding: 0 18px 18px; color: var(--dim); font-size: 12px; }
   #overlay { position: fixed; inset: 0; background: rgba(8, 10, 12, .88); display: none; align-items: center; justify-content: center; text-align: center; padding: 24px; }
   #overlay.show { display: flex; }
@@ -155,6 +177,7 @@
 <div id="update"></div>
 <div id="onboarding"></div>
 <main id="console"></main>
+<div id="mixbar"></div>
 
 <details id="settings-wrap">
   <summary id="settings-title"></summary>
@@ -222,6 +245,19 @@
       <span id="save-status"></span>
     </div>
     <div class="set-row">
+      <label id="lb-pin"></label>
+      <input type="password" id="pin" style="width:140px" inputmode="numeric" autocomplete="off">
+      <span class="small" id="pin-hint" style="margin-top:0"></span>
+    </div>
+    <div class="set-row" style="align-items:flex-start">
+      <label id="lb-rules"></label>
+      <div style="flex:1">
+        <div class="small" id="rules-hint" style="margin:0 0 6px"></div>
+        <div id="rule-rows"></div>
+        <button class="x" id="rule-add" style="margin-top:6px">+ <span id="lb-rule-add"></span></button>
+      </div>
+    </div>
+    <div class="set-row">
       <label id="lb-diag"></label>
       <button class="x ok" id="diag-copy"></button>
       <span class="small" id="diag-status" style="margin-top:0"></span>
@@ -236,7 +272,14 @@
 </details>
 <footer id="hint"></footer>
 <div id="overlay"><div class="box" id="overlay-msg"></div></div>
+<div id="pin-gate"><div class="box">
+  <div id="pin-title" style="font-weight:600"></div>
+  <input type="password" id="pin-input" inputmode="numeric" maxlength="8" autocomplete="off">
+  <div><button class="btn" id="pin-go"></button></div>
+  <div class="err" id="pin-err"></div>
+</div></div>
 <datalist id="sources-list"></datalist>
+<datalist id="scenes-list"></datalist>
 
 <script>
 //__QRLIB__
@@ -284,6 +327,20 @@
       profileHint: 'Un jeu dédié s’applique automatiquement quand ce profil est chargé sur le GoXLR.',
       save: 'Enregistrer',
       saved: 'Enregistré et appliqué',
+      mixes: 'Mixes',
+      mixAdd: 'Enregistrer le mix actuel',
+      mixName: 'Nom du mix (volumes et mutes actuels) :',
+      mixDelete: (n) => `Supprimer le mix « ${n} » ?`,
+      pin: "PIN d'accès réseau",
+      pinSet: 'Configuré. Vide pour conserver, OFF pour retirer.',
+      pinUnset: '4 à 8 chiffres (optionnel). Protège l\'accès depuis le réseau.',
+      pinTitle: "Code d'accès",
+      pinGo: 'Entrer',
+      pinBad: 'PIN incorrect',
+      rules: 'Scènes automatiques',
+      rulesHint: 'Quand Streamlabs passe sur cette scène, le mix choisi est appliqué en fondu.',
+      ruleAdd: 'Ajouter une règle',
+      scenePh: 'Scène Streamlabs...',
       diag: 'Support',
       diagCopy: 'Copier le diagnostic',
       diagCopied: 'Copié ! Colle-le dans une issue GitHub.',
@@ -340,6 +397,20 @@
       profileHint: 'A dedicated set applies automatically whenever this profile is loaded on the GoXLR.',
       save: 'Save',
       saved: 'Saved and applied',
+      mixes: 'Mixes',
+      mixAdd: 'Save current mix',
+      mixName: 'Mix name (current volumes and mutes):',
+      mixDelete: (n) => `Delete the mix "${n}"?`,
+      pin: 'Network access PIN',
+      pinSet: 'Configured. Empty keeps it, OFF removes it.',
+      pinUnset: '4 to 8 digits (optional). Protects network access.',
+      pinTitle: 'Access code',
+      pinGo: 'Enter',
+      pinBad: 'Wrong PIN',
+      rules: 'Scene automation',
+      rulesHint: 'When Streamlabs switches to this scene, the chosen mix is applied with a fade.',
+      ruleAdd: 'Add a rule',
+      scenePh: 'Streamlabs scene...',
       diag: 'Support',
       diagCopy: 'Copy diagnostic',
       diagCopied: 'Copied! Paste it into a GitHub issue.',
@@ -392,6 +463,12 @@
   $('#st-live').textContent = T.liveBadge;
   $('#lb-diag').textContent = T.diag;
   $('#diag-copy').textContent = T.diagCopy;
+  $('#lb-pin').textContent = T.pin;
+  $('#lb-rules').textContent = T.rules;
+  $('#rules-hint').textContent = T.rulesHint;
+  $('#lb-rule-add').textContent = T.ruleAdd;
+  $('#pin-title').textContent = T.pinTitle;
+  $('#pin-go').textContent = T.pinGo;
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const hhmmss = (t) => new Date(t).toTimeString().slice(0, 8);
@@ -435,6 +512,12 @@
         </div>`;
       }).join('');
     }
+
+    const mb = $('#mixbar');
+    mb.style.display = s.channels.length ? 'flex' : 'none';
+    mb.innerHTML = `<span class="bar-label">${esc(T.mixes)}</span>` +
+      (s.snapshots || []).map((n) => `<span class="mix-chip" data-mix="${esc(n)}">${esc(n)}<span class="del" title="${esc(T.mixDelete(n))}">&#215;</span></span>`).join('') +
+      `<span class="mix-chip add" id="mix-add">+ ${esc(T.mixAdd)}</span>`;
 
     const allUnresolved = s.channels.length > 0 && s.streamlabs.connected &&
       s.channels.every((c) => c.sources.every((x) => !x.resolved));
@@ -538,6 +621,37 @@
     } catch {}
   }
 
+  function ruleRow(scene, snapshot) {
+    const row = document.createElement('div');
+    row.className = 'rule-row';
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.setAttribute('list', 'scenes-list');
+    inp.placeholder = T.scenePh;
+    inp.value = scene || '';
+    const sel = document.createElement('select');
+    for (const n of lastState?.snapshots ?? []) {
+      const o = document.createElement('option');
+      o.value = n;
+      o.textContent = n;
+      if (n === snapshot) o.selected = true;
+      sel.appendChild(o);
+    }
+    const del = document.createElement('button');
+    del.className = 'x';
+    del.textContent = 'X';
+    del.onclick = () => row.remove();
+    row.append(inp, sel, del);
+    return row;
+  }
+
+  async function refreshScenes() {
+    try {
+      const r = await fetch('/api/scenes').then((x) => x.json());
+      $('#scenes-list').innerHTML = (r.scenes || []).map((n) => `<option value="${esc(n)}">`).join('');
+    } catch {}
+  }
+
   function initSettings(s) {
     const mm = $('#mutemode');
     mm.innerHTML = '';
@@ -558,15 +672,34 @@
     for (const m of s.profile.activeMappings) rows.appendChild(mapRow(m.channel, m.source));
     refreshSources();
 
+    $('#pin').placeholder = s.settings.hasPin ? T.pinSet : T.pinUnset;
+    const rr = $('#rule-rows');
+    rr.innerHTML = '';
+    for (const [scene, rule] of Object.entries(s.settings.sceneRules ?? {})) {
+      rr.appendChild(ruleRow(scene, rule.snapshot));
+    }
+    refreshScenes();
+
     fetch('/api/autostart').then((x) => x.json()).then((a) => {
       $('#autostart').checked = !!a.enabled;
     }).catch(() => {});
   }
 
+  $('#rule-add').addEventListener('click', () => {
+    $('#rule-rows').appendChild(ruleRow('', ''));
+    refreshScenes();
+  });
+
   function collectBody(extra = {}) {
     const mappings = [...document.querySelectorAll('#map-rows .map-row')]
       .map((row) => ({ channel: row.querySelector('select').value, source: row.querySelector('input').value.trim() }))
       .filter((m) => m.source);
+    const sceneRules = {};
+    for (const row of document.querySelectorAll('#rule-rows .rule-row')) {
+      const scene = row.querySelector('input').value.trim();
+      const snapshot = row.querySelector('select').value;
+      if (scene && snapshot) sceneRules[scene] = { snapshot };
+    }
     const body = {
       mappings,
       muteMode: $('#mutemode').value,
@@ -575,10 +708,13 @@
       lanAccess: $('#lan').checked,
       slobsHost: $('#slobs-host').value.trim(),
       slobsPort: $('#slobs-port').value.trim(),
+      sceneRules,
       ...extra,
     };
     const tokenVal = $('#token').value.trim();
     if (tokenVal) body.token = tokenVal;
+    const pinVal = $('#pin').value.trim();
+    if (pinVal) body.pin = pinVal;
     return body;
   }
 
@@ -687,6 +823,30 @@
     } catch (e) {
       el.style.color = 'var(--red)';
       el.textContent = e.message;
+    }
+  });
+
+  // --- Mix snapshot chips ----------------------------------------------------
+  $('#mixbar').addEventListener('click', async (e) => {
+    const del = e.target.closest('.del');
+    if (del) {
+      const name = del.closest('.mix-chip')?.dataset.mix;
+      if (name && confirm(T.mixDelete(name))) {
+        await fetch('/api/snapshot', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'delete', name }) }).catch(() => {});
+      }
+      return;
+    }
+    if (e.target.closest('#mix-add')) {
+      const name = prompt(T.mixName);
+      if (name && name.trim()) {
+        await fetch('/api/snapshot', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'save', name: name.trim() }) }).catch(() => {});
+      }
+      return;
+    }
+    const chip = e.target.closest('.mix-chip');
+    const name = chip?.dataset.mix;
+    if (name) {
+      fetch('/api/snapshot', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'apply', name }) }).catch(() => {});
     }
   });
 
@@ -800,15 +960,46 @@
     fetch('/api/quit', { method: 'POST' }).finally(() => showOverlay(T.stopped));
   });
 
-  const es = new EventSource('/api/events');
-  es.addEventListener('state', (e) => {
-    if (!quitRequested) $('#overlay').classList.remove('show');
-    renderState(JSON.parse(e.data));
+  function startSSE() {
+    const es = new EventSource('/api/events');
+    es.addEventListener('state', (e) => {
+      if (!quitRequested) $('#overlay').classList.remove('show');
+      renderState(JSON.parse(e.data));
+    });
+    es.addEventListener('log', (e) => addLog(JSON.parse(e.data)));
+    es.onerror = () => {
+      if (!quitRequested) showOverlay(T.lost); // EventSource reconnects on its own
+    };
+  }
+
+  async function submitPin() {
+    const pin = $('#pin-input').value.trim();
+    if (!pin) return;
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin }) }).catch(() => null);
+    if (r && r.ok) location.reload();
+    else {
+      $('#pin-err').textContent = T.pinBad;
+      $('#pin-input').value = '';
+    }
+  }
+  $('#pin-go').addEventListener('click', submitPin);
+  $('#pin-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitPin();
   });
-  es.addEventListener('log', (e) => addLog(JSON.parse(e.data)));
-  es.onerror = () => {
-    if (!quitRequested) showOverlay(T.lost); // EventSource reconnects on its own
-  };
+
+  async function boot() {
+    try {
+      const r = await fetch('/api/state');
+      if (r.status === 401) {
+        $('#pin-gate').classList.add('show');
+        $('#pin-input').focus();
+        return;
+      }
+      if (r.ok) renderState(await r.json());
+    } catch {}
+    startSSE();
+  }
+  boot();
 </script>
 </body>
 </html>

@@ -45,3 +45,30 @@ test('bad ui port is rejected', () => {
   const cfg = mergeWithDefaults({ ui: { port: 99999999 } });
   assert.throws(() => validateConfig(cfg), /port/);
 });
+
+test('valid snapshots and scene rules pass', () => {
+  const cfg = mergeWithDefaults({
+    sync: {
+      snapshots: { Pause: { volumes: { Music: 30 }, muted: { Music: true } } },
+      sceneRules: { 'Ma Scene': { snapshot: 'Pause' } },
+    },
+  });
+  validateConfig(cfg);
+});
+
+test('snapshot with an out-of-range volume is rejected', () => {
+  const cfg = mergeWithDefaults({ sync: { snapshots: { X: { volumes: { Music: 999 } } } } });
+  assert.throws(() => validateConfig(cfg), /0-255/);
+});
+
+test('scene rule without a snapshot name is rejected', () => {
+  const cfg = mergeWithDefaults({ sync: { sceneRules: { Scene: {} } } });
+  assert.throws(() => validateConfig(cfg), /snapshot/);
+});
+
+test('pin accepts null and 4-8 digits, rejects the rest', () => {
+  validateConfig(mergeWithDefaults({ ui: { pin: null } }));
+  validateConfig(mergeWithDefaults({ ui: { pin: '1234' } }));
+  assert.throws(() => validateConfig(mergeWithDefaults({ ui: { pin: 'abcd' } })), /pin/i);
+  assert.throws(() => validateConfig(mergeWithDefaults({ ui: { pin: '12' } })), /pin/i);
+});
