@@ -15,7 +15,9 @@
   header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
   h1 { margin: 0; font-size: 16px; font-weight: 600; }
   h1 .v { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
-  .hbtns { display: flex; gap: 8px; }
+  .hbtns { display: flex; gap: 8px; align-items: center; }
+  #lang { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font: inherit; cursor: pointer; }
+  #lang:hover { border-color: var(--accent); }
   #quit { background: transparent; color: var(--bad); border: 1px solid var(--bad); border-radius: 8px; padding: 6px 14px; cursor: pointer; font: inherit; }
   #quit:hover { background: var(--bad); color: #fff; }
   #open-settings { background: transparent; color: var(--ok); border: 1px solid var(--accent); border-radius: 8px; padding: 6px 14px; cursor: pointer; font: inherit; font-weight: 600; }
@@ -77,6 +79,11 @@
 <header>
   <h1>🎚️ goxlr-streamlabs-sync<span class="v">v__VERSION__</span></h1>
   <div class="hbtns">
+    <select id="lang" title="Language">
+      <option value="auto">🌐 Auto</option>
+      <option value="fr">Français</option>
+      <option value="en">English</option>
+    </select>
     <button id="open-settings"></button>
     <button id="quit"></button>
   </div>
@@ -182,9 +189,17 @@
       onbDoc: 'Full guide: ',
     },
   };
-  const T = LANGS[(navigator.language || 'en').slice(0, 2)] || LANGS.en;
+  // Language: 'auto' follows the browser; can be forced and is remembered per browser.
+  const storedLang = localStorage.getItem('gss-lang') || 'auto';
+  const effectiveLang = storedLang === 'auto' ? (navigator.language || 'en').slice(0, 2) : storedLang;
+  const T = LANGS[effectiveLang] || LANGS.en;
 
   const $ = (s) => document.querySelector(s);
+  $('#lang').value = storedLang;
+  $('#lang').addEventListener('change', (e) => {
+    localStorage.setItem('gss-lang', e.target.value);
+    location.reload();
+  });
   $('#quit').textContent = T.quit;
   $('#log-title').textContent = T.logs;
   $('#hint').textContent = T.hint;

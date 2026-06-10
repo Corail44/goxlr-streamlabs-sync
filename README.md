@@ -114,6 +114,8 @@ To launch it automatically with Windows: enable **Start with Windows** in the da
 
 The tool serves a small local web page (no external service, no dependency): connection status of both ends, live channel volumes, mute states, mapped sources and recent logs — plus a *Quit* button. Default address: **http://127.0.0.1:14571**. Set `ui.host` to `"0.0.0.0"` if you want to open it from another device on your network. Closing the tab never stops the sync.
 
+The interface language follows your browser (French/English) and can be forced with the **🌐 selector** in the header — the choice is remembered per browser. Adding a language is a small PR: one dictionary block in `src/ui.html`.
+
 ## Connecting to Streamlabs: pipe vs websocket
 
 By default (`"transport": "auto"`), the tool connects through Streamlabs' local **named pipe** (`\\.\pipe\slobs`) — zero configuration needed.

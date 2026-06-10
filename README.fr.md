@@ -114,6 +114,8 @@ Pour le lancer automatiquement avec Windows : active **Démarrer avec Windows** 
 
 L'outil sert une petite page web locale (aucun service externe, aucune dépendance) : état des deux connexions, volumes des canaux en temps réel, mutes, sources mappées et logs récents — plus un bouton *Quitter*. Adresse par défaut : **http://127.0.0.1:14571**. Mets `ui.host` à `"0.0.0.0"` pour y accéder depuis un autre appareil de ton réseau. Fermer l'onglet n'arrête jamais la sync.
 
+La langue de l'interface suit ton navigateur (français/anglais) et peut être forcée avec le **sélecteur 🌐** de l'en-tête — le choix est mémorisé par navigateur. Ajouter une langue est une petite PR : un bloc de dictionnaire dans `src/ui.html`.
+
 ## Connexion à Streamlabs : pipe ou websocket
 
 Par défaut (`"transport": "auto"`), l'outil se connecte via le **named pipe** local de Streamlabs (`\\.\pipe\slobs`) — aucune configuration.
