@@ -188,6 +188,10 @@ Le **bouton cough** du micro est géré aussi (compté comme un mute du canal `M
 - **`Sources not found in Streamlabs`** - les noms `source` du `config.json` doivent correspondre exactement aux noms des sources Streamlabs (sensible à la casse). Lance `node src/index.js --list`.
 - Lance avec `--verbose` pour voir chaque patch et appel API, et `--dry-run` pour tester sans toucher à Streamlabs.
 
+## Overlay de stream (popups FX)
+
+L'outil sert aussi une page overlay transparente pour tes scènes : ajoute `http://127.0.0.1:14571/overlay` comme **source navigateur** dans Streamlabs (1920x1080). Une popup glisse à l'écran quand les FX vocaux s'activent/changent de preset, et quand un pad du sampler joue. Options d'URL : `?pos=tl|tr|bl|br` (coin, défaut br), `?ms=3000` (durée), `?fx=0` ou `?samples=0` (filtrer), `?demo=1` (fausses popups pour positionner la source).
+
 ## API HTTP (Stream Deck, macros)
 
 Tout ce que fait le dashboard passe par une petite API HTTP locale : n'importe quel outil capable d'envoyer une requête HTTP (plugins Stream Deck, AutoHotkey, Bitfocus Companion...) peut piloter la sync. Corps en JSON, sur `http://127.0.0.1:14571` :

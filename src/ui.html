@@ -280,6 +280,16 @@
       </div>
     </div>
     <div class="set-row">
+      <label id="lb-overlay"></label>
+      <input type="text" id="overlay-url" readonly style="min-width:280px">
+      <button class="x ok" id="overlay-copy"></button>
+      <span class="small" id="overlay-status" style="margin-top:0"></span>
+    </div>
+    <div class="set-row" style="margin-top:-4px">
+      <label></label>
+      <span class="small" id="overlay-hint" style="margin-top:0"></span>
+    </div>
+    <div class="set-row">
       <label id="lb-diag"></label>
       <button class="x ok" id="diag-copy"></button>
       <span class="small" id="diag-status" style="margin-top:0"></span>
@@ -367,6 +377,10 @@
       rulesHint: 'Quand Streamlabs passe sur cette scène, le mix choisi est appliqué en fondu.',
       ruleAdd: 'Ajouter une règle',
       scenePh: 'Scène Streamlabs...',
+      overlay: 'Overlay de stream (popups FX)',
+      overlayCopy: 'Copier',
+      overlayCopied: 'URL copiée !',
+      overlayHint: "Ajoute cette URL en source navigateur dans Streamlabs (1920x1080, fond transparent) : une popup glisse à l'écran quand un FX s'active ou qu'un sample part. Options : ?pos=tl|tr|bl|br, ?ms=3000, ?fx=0, ?samples=0, ?demo=1 pour prévisualiser.",
       diag: 'Support',
       diagCopy: 'Copier le diagnostic',
       diagCopied: 'Copié ! Colle-le dans une issue GitHub.',
@@ -441,6 +455,10 @@
       rulesHint: 'When Streamlabs switches to this scene, the chosen mix is applied with a fade.',
       ruleAdd: 'Add a rule',
       scenePh: 'Streamlabs scene...',
+      overlay: 'Stream overlay (FX popups)',
+      overlayCopy: 'Copy',
+      overlayCopied: 'URL copied!',
+      overlayHint: 'Add this URL as a browser source in Streamlabs (1920x1080, transparent): a popup slides in when an FX activates or a sample plays. Options: ?pos=tl|tr|bl|br, ?ms=3000, ?fx=0, ?samples=0, ?demo=1 to preview.',
       diag: 'Support',
       diagCopy: 'Copy diagnostic',
       diagCopied: 'Copied! Paste it into a GitHub issue.',
@@ -501,6 +519,22 @@
   $('#pin-go').textContent = T.pinGo;
   $('#me-save').textContent = T.save;
   $('#me-close').textContent = T.close;
+  $('#lb-overlay').textContent = T.overlay;
+  $('#overlay-copy').textContent = T.overlayCopy;
+  $('#overlay-hint').textContent = T.overlayHint;
+  $('#overlay-url').value = location.origin + '/overlay';
+  $('#overlay-copy').addEventListener('click', async () => {
+    const el = $('#overlay-status');
+    try {
+      await navigator.clipboard.writeText($('#overlay-url').value);
+    } catch {
+      $('#overlay-url').select();
+      document.execCommand('copy');
+    }
+    el.style.color = 'var(--led)';
+    el.textContent = T.overlayCopied;
+    setTimeout(() => { el.textContent = ''; }, 3000);
+  });
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const hhmmss = (t) => new Date(t).toTimeString().slice(0, 8);

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>goxlr-streamlabs-sync overlay</title>
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; }
+  #stack { position: fixed; display: flex; flex-direction: column; gap: 10px; }
+  .pos-br { right: 24px; bottom: 24px; align-items: flex-end; }
+  .pos-bl { left: 24px; bottom: 24px; align-items: flex-start; }
+  .pos-tr { right: 24px; top: 24px; align-items: flex-end; }
+  .pos-tl { left: 24px; top: 24px; align-items: flex-start; }
+  .pop { display: flex; align-items: center; gap: 12px; background: rgba(15, 17, 20, .92);
+         border: 1px solid #34d97b; border-radius: 6px; padding: 12px 20px;
+         font: 600 19px "Segoe UI", system-ui, sans-serif; color: #d6dde4;
+         letter-spacing: 1.5px; text-transform: uppercase; }
+  .pop .dot { width: 10px; height: 10px; border-radius: 50%; background: #34d97b; box-shadow: 0 0 10px #34d97b; }
+  .pop b { color: #34d97b; font-weight: 700; }
+  .pop.off { border-color: #76828e; }
+  .pop.off .dot { background: #76828e; box-shadow: none; }
+  .pop.sample { border-color: #ffb454; }
+  .pop.sample .dot { background: #ffb454; box-shadow: 0 0 10px #ffb454; }
+  .pop.sample b { color: #ffb454; }
+  @keyframes slidein { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes slideout { to { transform: translateY(-8px); opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="stack"></div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const pos = ['tl', 'tr', 'bl', 'br'].includes(q.get('pos')) ? q.get('pos') : 'br';
+  document.getElementById('stack').className = 'pos-' + pos;
+  const showFx = q.get('fx') !== '0';
+  const showSamples = q.get('samples') !== '0';
+  const dur = Math.max(1200, parseInt(q.get('ms') ?? '3000', 10) || 3000);
+
+  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+  function pop(kind, label, value) {
+    const el = document.createElement('div');
+    el.className = 'pop ' + kind;
+    el.style.animation = `slidein .25s ease, slideout .3s ease ${(dur - 300) / 1000}s forwards`;
+    el.innerHTML = `<span class="dot"></span><span>${esc(label)}${value ? ' <b>' + esc(value) + '</b>' : ''}</span>`;
+    const stack = document.getElementById('stack');
+    stack.appendChild(el);
+    while (stack.children.length > 3) stack.removeChild(stack.firstChild);
+    setTimeout(() => el.remove(), dur + 100);
+  }
+
+  let prev = null;
+  function handle(s) {
+    if (prev) {
+      if (showFx && s.fx && prev.fx) {
+        if (s.fx.enabled !== prev.fx.enabled) {
+          if (s.fx.enabled) pop('on', 'FX', s.fx.names?.[s.fx.active] ?? s.fx.active ?? 'ON');
+          else pop('off', 'FX OFF');
+        } else if (s.fx.enabled && s.fx.active !== prev.fx.active) {
+          pop('on', 'FX', s.fx.names?.[s.fx.active] ?? s.fx.active);
+        }
+      }
+      if (showSamples) {
+        for (const bank of Object.keys(s.sampler ?? {})) {
+          for (const [btn, d] of Object.entries(s.sampler[bank] ?? {})) {
+            const was = prev.sampler?.[bank]?.[btn]?.playing;
+            if (d.playing && !was) pop('sample', 'SAMPLE', d.name);
+          }
+        }
+      }
+    }
+    prev = s;
+  }
+
+  const es = new EventSource('/api/events');
+  es.addEventListener('state', (e) => handle(JSON.parse(e.data)));
+
+  // Preview mode for positioning the browser source: /overlay?demo=1
+  if (q.get('demo') === '1') {
+    const demo = [
+      () => pop('on', 'FX', 'Big Verb'),
+      () => pop('sample', 'SAMPLE', 'airhorn.mp3'),
+      () => pop('off', 'FX OFF'),
+    ];
+    let i = 0;
+    setInterval(() => demo[i++ % demo.length](), 2200);
+  }
+</script>
+</body>
+</html>

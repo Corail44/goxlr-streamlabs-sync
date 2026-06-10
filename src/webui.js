@@ -49,6 +49,12 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
   const html = readAssetText('src/ui.html')
     .replace('__VERSION__', () => version)
     .replace('//__QRLIB__', () => qrLib);
+  let overlayHtml = '';
+  try {
+    overlayHtml = readAssetText('src/overlay.html');
+  } catch {
+    logger.debug('[ui] overlay.html missing');
+  }
   const clients = new Set();
   let cfgFile = configFile;
 
@@ -352,6 +358,9 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       if (req.method === 'GET' && (url === '/' || url === '/index.html')) {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
         res.end(html);
+      } else if (req.method === 'GET' && url === '/overlay') {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end(overlayHtml || 'overlay asset missing');
       } else if (req.method === 'GET' && url === '/icon.ico') {
         try {
           const icon = readAssetBuffer('assets/icon.ico');

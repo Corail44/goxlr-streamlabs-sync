@@ -188,6 +188,10 @@ The mic **cough button** is handled too (counts as a mute on the `Mic` channel).
 - **`Sources not found in Streamlabs`** - the `source` names in `config.json` must match the Streamlabs source names exactly (case-sensitive). Run `node src/index.js --list`.
 - Run with `--verbose` to see every patch and API call, and `--dry-run` to test without touching Streamlabs.
 
+## Stream overlay (FX popups)
+
+The tool also serves a transparent overlay page for your scenes: add `http://127.0.0.1:14571/overlay` as a **browser source** in Streamlabs (1920x1080). A popup slides in when the voice FX turns on/off or changes preset, and when a sampler pad plays. URL options: `?pos=tl|tr|bl|br` (corner, default br), `?ms=3000` (duration), `?fx=0` or `?samples=0` (filter), `?demo=1` (fake popups to position the source).
+
 ## HTTP API (Stream Deck, macros)
 
 Everything the dashboard does goes through a small local HTTP API, so any tool able to send an HTTP request (Stream Deck plugins, AutoHotkey, Bitfocus Companion...) can drive the sync. JSON bodies, on `http://127.0.0.1:14571`:
