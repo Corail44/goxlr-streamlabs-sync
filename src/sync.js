@@ -327,6 +327,17 @@ export class SyncEngine {
 
   // ---- Dashboard actions ---------------------------------------------------
 
+  // Sets a channel volume from the dashboard (touch faders). The GoXLR is
+  // the master: the device change then flows to Streamlabs through the
+  // normal forward sync.
+  setChannelVolume(channel, volume) {
+    if (!this.byChannel.has(channel)) throw new Error(`no mapping for channel ${channel}`);
+    const v = Math.max(0, Math.min(255, Math.round(Number(volume))));
+    if (!Number.isFinite(v)) throw new Error('invalid volume');
+    if (!this.goxlr.setEffectiveVolume(channel, v)) throw new Error('GoXLR not connected');
+    this.log.debug(`[sync] Dashboard fader: GoXLR ${channel} -> ${v}`);
+  }
+
   // Mutes/unmutes the Streamlabs source(s) mapped to a channel. Works for
   // every channel, including those without a physical fader.
   async setSourcesMuted(channel, muted) {

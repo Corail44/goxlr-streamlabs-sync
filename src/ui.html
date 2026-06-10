@@ -57,7 +57,8 @@
            padding: 10px 8px 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .s-name { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; }
   .s-track { height: 132px; width: 16px; background: var(--panel2); border: 1px solid var(--line); border-radius: 3px;
-             position: relative; overflow: hidden; }
+             position: relative; overflow: hidden; cursor: ns-resize; touch-action: none; }
+  .s-track:hover { border-color: var(--dim); }
   .s-track i { position: absolute; bottom: 0; left: 0; right: 0; background: var(--led);
                box-shadow: 0 -2px 0 0 #e8eef4; transition: height .12s ease; }
   .strip.muted .s-track i { background: var(--red); }
@@ -122,6 +123,7 @@
     #wordmark .v { display: none; }
     #console { padding: 12px 10px; gap: 8px; }
     .strip { width: calc(33.33% - 6px); }
+    .s-track { width: 26px; height: 150px; }
     details { margin: 4px 10px 12px; }
     .set-row > label { min-width: 100%; }
     .map-row select { width: 110px; }
@@ -420,17 +422,19 @@
       $('#update').innerHTML = `${esc(T.updateAvailable(s.update.latest))} <a href="${esc(s.update.url)}" target="_blank" rel="noopener">${esc(T.download)}</a>`;
     }
 
-    $('#console').innerHTML = s.channels.map((c) => {
-      const pct = c.volume == null ? 0 : Math.round(c.volume / 255 * 100);
-      return `
-      <div class="strip${c.muted ? ' muted' : ''}" data-channel="${esc(c.channel)}" data-muted="${c.muted ? 1 : 0}">
-        <div class="s-name">${esc(c.channel)}</div>
-        <div class="s-track"><i style="height:${pct}%"></i></div>
-        <div class="s-val">${c.volume == null ? '--' : pct}<small>%</small></div>
-        <button class="s-mute" title="${esc(T.muteTitle)}">${T.muted}</button>
-        <div class="s-src">${c.sources.map((x) => `<span class="${x.resolved ? '' : 'bad'}">${esc(x.name)}</span>`).join('<br>')}</div>
-      </div>`;
-    }).join('');
+    if (!dragging) {
+      $('#console').innerHTML = s.channels.map((c) => {
+        const pct = c.volume == null ? 0 : Math.round(c.volume / 255 * 100);
+        return `
+        <div class="strip${c.muted ? ' muted' : ''}" data-channel="${esc(c.channel)}" data-muted="${c.muted ? 1 : 0}">
+          <div class="s-name">${esc(c.channel)}</div>
+          <div class="s-track"><i style="height:${pct}%"></i></div>
+          <div class="s-val">${c.volume == null ? '--' : pct}<small>%</small></div>
+          <button class="s-mute" title="${esc(T.muteTitle)}">${T.muted}</button>
+          <div class="s-src">${c.sources.map((x) => `<span class="${x.resolved ? '' : 'bad'}">${esc(x.name)}</span>`).join('<br>')}</div>
+        </div>`;
+      }).join('');
+    }
 
     const allUnresolved = s.channels.length > 0 && s.streamlabs.connected &&
       s.channels.every((c) => c.sources.every((x) => !x.resolved));
@@ -685,6 +689,70 @@
       el.textContent = e.message;
     }
   });
+
+  // --- Touch faders: drag a strip track to set the GoXLR volume -------------
+  let dragging = null;
+
+  function volFromEvent(e) {
+    const r = dragging.rect;
+    const ratio = Math.min(1, Math.max(0, 1 - (e.clientY - r.top) / r.height));
+    return Math.round(ratio * 255);
+  }
+
+  function postVolume(channel, volume) {
+    fetch('/api/channel-volume', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ channel, volume }),
+    }).catch(() => {});
+  }
+
+  function applyDrag(e) {
+    if (!dragging) return;
+    const v = volFromEvent(e);
+    const pct = Math.round(v / 255 * 100);
+    dragging.fill.style.height = pct + '%';
+    dragging.val.innerHTML = pct + '<small>%</small>';
+    dragging.lastV = v;
+    const now = Date.now();
+    if (now - dragging.lastSent >= 70) {
+      dragging.lastSent = now;
+      postVolume(dragging.channel, v);
+    }
+  }
+
+  $('#console').addEventListener('pointerdown', (e) => {
+    const track = e.target.closest('.s-track');
+    if (!track) return;
+    const strip = track.closest('.strip');
+    const channel = strip?.dataset.channel;
+    if (!channel) return;
+    e.preventDefault();
+    try { track.setPointerCapture(e.pointerId); } catch {}
+    dragging = {
+      channel,
+      fill: track.querySelector('i'),
+      val: strip.querySelector('.s-val'),
+      rect: track.getBoundingClientRect(),
+      lastSent: 0,
+      lastV: null,
+    };
+    applyDrag(e);
+  });
+  $('#console').addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    e.preventDefault();
+    applyDrag(e);
+  });
+  const endDrag = (e) => {
+    if (!dragging) return;
+    const v = e.clientY != null ? volFromEvent(e) : dragging.lastV;
+    const channel = dragging.channel;
+    dragging = null;
+    if (v != null) postVolume(channel, v); // final value, untrottled
+  };
+  $('#console').addEventListener('pointerup', endDrag);
+  $('#console').addEventListener('pointercancel', endDrag);
 
   // --- Strips / lifecycle ----------------------------------------------------
   $('#console').addEventListener('click', async (e) => {

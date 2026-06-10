@@ -327,6 +327,19 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
         json(res, 200, { ok: true });
         logger.info('[ui] Restart requested from the dashboard.');
         setTimeout(onRestart, 250);
+      } else if (req.method === 'POST' && url === '/api/channel-volume') {
+        let body;
+        try {
+          body = JSON.parse(await readBody(req));
+        } catch {
+          return json(res, 400, { error: 'invalid JSON body' });
+        }
+        try {
+          engine.setChannelVolume(String(body.channel ?? ''), body.volume);
+          json(res, 200, { ok: true });
+        } catch (e) {
+          json(res, 400, { error: e.message });
+        }
       } else if (req.method === 'POST' && url === '/api/channel-mute') {
         let body;
         try {
