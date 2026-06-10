@@ -7,6 +7,7 @@
 <title>goxlr-streamlabs-sync</title>
 <style>
   :root {
+    color-scheme: dark;
     --bg: #0f1114; --panel: #15181c; --panel2: #0b0d10; --line: #242930;
     --text: #d6dde4; --dim: #76828e; --led: #34d97b; --red: #ff5252; --amber: #ffb454;
   }
@@ -80,6 +81,7 @@
   select, input[type=text], input[type=password] { background: var(--panel2); color: var(--text); border: 1px solid var(--line);
     border-radius: 4px; padding: 7px 10px; font: 13px "Segoe UI", sans-serif; }
   select:focus, input:focus { outline: none; border-color: var(--led); }
+  select option { background: var(--panel2); color: var(--text); }
   input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--led); }
   .map-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
   .map-row select { width: 140px; }
