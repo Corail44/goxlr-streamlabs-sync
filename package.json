@@ -16,6 +16,14 @@
   "engines": {
     "node": ">=22"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Corail44/goxlr-streamlabs-sync.git"
+  },
+  "homepage": "https://github.com/Corail44/goxlr-streamlabs-sync#readme",
+  "bugs": {
+    "url": "https://github.com/Corail44/goxlr-streamlabs-sync/issues"
+  },
   "devDependencies": {
     "esbuild": "^0.24.2",
     "postject": "^1.0.0-alpha.6"

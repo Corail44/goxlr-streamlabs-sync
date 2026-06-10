@@ -43,7 +43,7 @@ Download `goxlr-streamlabs-sync.exe` from the [Releases page](../../releases), p
 ### Option B — run from source
 
 ```
-git clone https://github.com/YOUR_USER/goxlr-streamlabs-sync.git
+git clone https://github.com/Corail44/goxlr-streamlabs-sync.git
 cd goxlr-streamlabs-sync
 ```
 
