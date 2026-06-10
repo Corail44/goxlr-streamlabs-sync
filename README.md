@@ -17,7 +17,10 @@ Similar tools exist for OBS Studio ([goxlr-obs-fader-sync](https://github.com/Fr
 ## Features
 
 - Real-time volume sync: GoXLR fader (0-255) → Streamlabs source volume slider
+- **Two-way**: moving a Streamlabs slider drives the GoXLR back (motorized faders move), with echo suppression so the two sides never fight
+- **Submix aware**: when the Broadcast Mix listens to Mix B, submix volumes are used in both directions (a MIX B badge shows in the dashboard)
 - Mute sync with stream-aware logic: only mutes the source when the GoXLR mute actually affects the stream (configurable)
+- Clickable MUTE chips on the dashboard strips: mute any mapped channel's Streamlabs source, even channels without a physical fader
 - Any GoXLR channel can be mapped to any number of Streamlabs sources
 - Works with the GoXLR Full and GoXLR Mini, and with multiple devices
 - Zero npm dependencies, single small Node.js process, auto-reconnects to both ends
@@ -140,6 +143,7 @@ With a token configured, `auto` tries the pipe first and falls back to the webso
 | `sync.throttleMs` | `50` | Min delay between two volume updates per source (fader sweeps) |
 | `sync.curveExponent` | `1.0` | `deflection = (volume/255)^exponent`. `1.0` = slider mirrors fader position |
 | `sync.muteMode` | `follow_stream` | See below |
+| `sync.twoWay` | `true` | Streamlabs slider moves drive the GoXLR back (motorized faders) |
 | `sync.syncOnConnect` | `true` | Push the full GoXLR state to Streamlabs on (re)connect |
 | `sync.mappings[]` | - | `{ channel, source, syncVolume?, syncMute? }` |
 | `ui.enabled` | `true` | Serve the local web dashboard |
@@ -161,9 +165,8 @@ The mic **cough button** is handled too (counts as a mute on the `Mic` channel).
 
 ## Limitations
 
-- One-way sync (GoXLR → Streamlabs). Moving a slider in Streamlabs does not move the motorized fader.
-- GoXLR **submixes** are not supported yet - the main channel volume is used.
-- Channels not assigned to a fader can still sync volume (changed via the Utility UI), but have no mute button to sync.
+- Mute changes made in Streamlabs are not pushed back to the GoXLR (its mutes are per-fader with configurable targets, so a faithful reverse mapping does not exist). Use the GoXLR buttons or the dashboard MUTE chips.
+- Submix link ratios are left untouched: the tool reads and writes volumes only.
 
 ## Troubleshooting
 

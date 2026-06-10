@@ -65,11 +65,14 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       hasToken: !!cfg.streamlabs.token,
       slobsHost: parseSlobsUrl().host,
       slobsPort: parseSlobsUrl().port,
+      twoWay: cfg.sync.twoWay !== false,
     },
+    submixActive: !!goxlr.snapshotNow?.submixActive,
     channels: [...engine.byChannel.entries()].map(([ch, maps]) => ({
       channel: ch,
       volume: goxlr.snapshotNow?.volumes?.[ch] ?? null,
-      muted: engine.isMuted(goxlr.snapshotNow?.mutes?.[ch] ?? []),
+      muted: engine.channelSourcesMuted(maps),
+      goxlrMuted: engine.isMuted(goxlr.snapshotNow?.mutes?.[ch] ?? []),
       sources: maps.map((m) => ({ name: m.source, resolved: !!engine.resourceIds.get(m.source) })),
     })),
     logs: logger.recent(),
@@ -86,9 +89,10 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
     }, 100);
   };
 
-  for (const ev of ['ready', 'volume', 'mute', 'disconnected']) goxlr.on(ev, pushState);
+  for (const ev of ['ready', 'volume', 'mute', 'submix', 'disconnected']) goxlr.on(ev, pushState);
   slobs.on('connected', pushState);
   slobs.on('disconnected', pushState);
+  slobs.on('apiEvent', pushState);
   logger.subscribe((line) => {
     const payload = `event: log\ndata: ${JSON.stringify(line)}\n\n`;
     for (const res of clients) res.write(payload);
@@ -127,6 +131,7 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       }));
     }
     if (typeof body.muteMode === 'string') next.sync.muteMode = body.muteMode;
+    if (typeof body.twoWay === 'boolean') next.sync.twoWay = body.twoWay;
     const newToken = typeof body.token === 'string' ? body.token.trim() : '';
     if (newToken) next.streamlabs.token = newToken;
 
@@ -165,7 +170,7 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       cfg.streamlabs.url = next.streamlabs.url;
       slobs.url = next.streamlabs.url.replace(/\/+$/, '');
     }
-    await engine.applySettings({ mappings: next.sync.mappings, muteMode: next.sync.muteMode });
+    await engine.applySettings({ mappings: next.sync.mappings, muteMode: next.sync.muteMode, twoWay: next.sync.twoWay });
     logger.ok(`[ui] Settings saved to ${target}`);
     pushState();
     json(res, 200, { ok: true, file: target });
@@ -215,6 +220,20 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
         }
       } else if (req.method === 'POST' && url === '/api/config') {
         await handleConfigSave(req, res);
+      } else if (req.method === 'POST' && url === '/api/channel-mute') {
+        let body;
+        try {
+          body = JSON.parse(await readBody(req));
+        } catch {
+          return json(res, 400, { error: 'invalid JSON body' });
+        }
+        try {
+          await engine.setSourcesMuted(String(body.channel ?? ''), !!body.muted);
+          pushState();
+          json(res, 200, { ok: true });
+        } catch (e) {
+          json(res, 400, { error: e.message });
+        }
       } else if (req.method === 'POST' && url === '/api/test-token') {
         let body = {};
         try {

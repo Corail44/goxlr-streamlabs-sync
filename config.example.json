@@ -22,6 +22,7 @@
     "curveExponent": 1.0,
     "muteMode": "follow_stream",
     "syncOnConnect": true,
+    "twoWay": true,
     "mappings": [
       { "channel": "Mic",    "source": "Mic (GoXLR)" },
       { "channel": "Music",  "source": "Music (GoXLR)" },

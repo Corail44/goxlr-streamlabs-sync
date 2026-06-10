@@ -1,6 +1,9 @@
 import { EventEmitter } from 'node:events';
 import { applyPatch } from './jsonpatch.js';
 
+// Channels that have a submix volume (outputs like Headphones do not).
+const SUBMIX_CHANNELS = ['Mic', 'LineIn', 'Console', 'System', 'Game', 'Chat', 'Sample', 'Music'];
+
 // Client for the GoXLR Utility daemon websocket (https://github.com/GoXLR-on-Linux/goxlr-utility).
 // Mirrors the full DaemonStatus locally by applying the JSON Patch stream, then
 // emits high-level events:
@@ -51,6 +54,29 @@ export class GoXLRClient extends EventEmitter {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ id: this.nextId++, data }));
     }
+  }
+
+  #command(command) {
+    if (!this.serial) return false;
+    this.#send({ Command: [this.serial, command] });
+    return true;
+  }
+
+  setVolume(channel, volume) {
+    return this.#command({ SetVolume: [channel, volume] });
+  }
+
+  setSubMixVolume(channel, volume) {
+    return this.#command({ SetSubMixVolume: [channel, volume] });
+  }
+
+  // Writes where the stream actually listens: the submix volume when the
+  // Broadcast Mix is assigned to Mix B, the main channel volume otherwise.
+  setEffectiveVolume(channel, volume) {
+    if (this.lastSnapshot?.submixActive && SUBMIX_CHANNELS.includes(channel)) {
+      return this.setSubMixVolume(channel, volume);
+    }
+    return this.setVolume(channel, volume);
   }
 
   #onClose() {
@@ -133,6 +159,10 @@ export class GoXLRClient extends EventEmitter {
       return;
     }
 
+    if (prev.submixActive !== snap.submixActive) {
+      this.log.info(`[goxlr] Stream mix source: ${snap.submixActive ? 'Mix B (submix volumes)' : 'Mix A (main volumes)'}`);
+      this.emit('submix', snap.submixActive);
+    }
     for (const [ch, v] of Object.entries(snap.volumes)) {
       if (prev.volumes[ch] !== v) this.emit('volume', ch, v);
     }
@@ -144,11 +174,22 @@ export class GoXLRClient extends EventEmitter {
     }
   }
 
-  // snapshot = { volumes: {Channel: 0-255}, mutes: {Channel: [{state, func}]} }
+  // snapshot = { volumes, mutes, submixActive }
+  // volumes are EFFECTIVE stream volumes: when submixes are enabled and the
+  // Broadcast Mix listens to Mix B, the submix volume replaces the main one.
   // mutes only contains ACTIVE entries (state !== 'Unmuted'); a missing key means unmuted.
   #snapshot(serial) {
     const m = this.status.mixers[serial];
-    const volumes = { ...(m?.levels?.volumes ?? {}) };
+    const levels = m?.levels ?? {};
+    const submix = levels.submix ?? null;
+    const submixActive = !!submix && submix.outputs?.BroadcastMix === 'B';
+
+    const volumes = {};
+    for (const [ch, v] of Object.entries(levels.volumes ?? {})) {
+      const sub = submixActive && SUBMIX_CHANNELS.includes(ch) ? submix.inputs?.[ch]?.volume : undefined;
+      volumes[ch] = typeof sub === 'number' ? sub : v;
+    }
+
     const mutes = {};
     const add = (ch, state, func) => {
       if (!ch || !state || state === 'Unmuted') return;
@@ -159,7 +200,7 @@ export class GoXLRClient extends EventEmitter {
     }
     const cough = m?.cough_button;
     if (cough) add('Mic', cough.state, cough.mute_type);
-    return { volumes, mutes };
+    return { volumes, mutes, submixActive };
   }
 
   get snapshotNow() {

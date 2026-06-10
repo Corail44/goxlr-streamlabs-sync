@@ -250,7 +250,19 @@ export class StreamlabsClient extends EventEmitter {
       else p.resolve(msg.result);
       return;
     }
+    // Pushed subscription events, e.g. AudioService.audioSourceUpdated
+    const r = msg.result;
+    if (r && r._type === 'EVENT' && r.emitter === 'STREAM') {
+      this.emit('apiEvent', r.resourceId, r.data);
+      return;
+    }
     this.log.debug('[streamlabs] event:', JSON.stringify(msg).slice(0, 200));
+  }
+
+  // Subscribe to live audio source updates (volume slider moves, mutes...).
+  // Subscriptions die with the connection: call again after each 'connected'.
+  subscribeAudioUpdates() {
+    return this.call('audioSourceUpdated', 'AudioService');
   }
 
   async #onTransportUp() {

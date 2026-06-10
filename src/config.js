@@ -38,6 +38,7 @@ const DEFAULTS = {
     curveExponent: 1.0,
     muteMode: 'follow_stream',
     syncOnConnect: true,
+    twoWay: true,
     mappings: [],
   },
   ui: {
@@ -99,6 +100,9 @@ export function validateConfig(cfg) {
   }
   if (typeof s.throttleMs !== 'number' || s.throttleMs < 0) {
     throw new Error('config: sync.throttleMs must be a number >= 0');
+  }
+  if (typeof s.twoWay !== 'boolean') {
+    throw new Error('config: sync.twoWay must be a boolean');
   }
   if (!TRANSPORTS.includes(cfg.streamlabs.transport)) {
     throw new Error(`config: streamlabs.transport must be one of: ${TRANSPORTS.join(', ')}`);
