@@ -21,6 +21,7 @@ Des outils équivalents existent pour OBS Studio ([goxlr-obs-fader-sync](https:/
 - Chaque canal GoXLR peut être mappé vers une ou plusieurs sources Streamlabs
 - Compatible GoXLR Full et Mini, multi-appareils
 - Zéro dépendance npm, un seul petit process Node.js, reconnexion automatique des deux côtés
+- Dashboard web local (volumes en direct, mutes, logs) + lanceur sans fenêtre — rien qui traîne dans ta barre des tâches
 - Mode `--list` pour découvrir tes canaux et les noms exacts de tes sources
 - Mode `--dry-run` pour tester sans risque
 
@@ -89,15 +90,17 @@ node src/index.js --list
 
 ### 3. Lancer
 
-Double-clique sur `start.bat`, ou :
+**Recommandé (aucune fenêtre) :** double-clique sur **`start-hidden.vbs`** — la sync tourne silencieusement en arrière-plan et le dashboard s'ouvre dans ton navigateur. Re-double-cliquer rouvre juste le dashboard (instance unique). Pour arrêter : `stop.bat` ou le bouton *Quitter* du dashboard.
 
-```
-npm start
-```
+**Avec une console :** double-clique sur `start.bat`, ou `npm start`.
 
 Bouge un fader sur le GoXLR — le slider Streamlabs correspondant suit. 🎚️
 
-Pour le lancer automatiquement avec Windows : `Win+R`, tape `shell:startup`, et dépose un raccourci vers `start.bat` dans ce dossier.
+Pour le lancer automatiquement avec Windows : `Win+R`, tape `shell:startup`, et dépose un raccourci vers `start-hidden.vbs` dans ce dossier.
+
+### Le dashboard
+
+L'outil sert une petite page web locale (aucun service externe, aucune dépendance) : état des deux connexions, volumes des canaux en temps réel, mutes, sources mappées et logs récents — plus un bouton *Quitter*. Adresse par défaut : **http://127.0.0.1:14571**. Mets `ui.host` à `"0.0.0.0"` pour y accéder depuis un autre appareil de ton réseau. Fermer l'onglet n'arrête jamais la sync.
 
 ## Connexion à Streamlabs : pipe ou websocket
 
@@ -125,6 +128,10 @@ Avec un token configuré, `auto` essaie le pipe puis bascule tout seul sur le we
 | `sync.muteMode` | `follow_stream` | Voir ci-dessous |
 | `sync.syncOnConnect` | `true` | Pousse l'état complet du GoXLR vers Streamlabs à la (re)connexion |
 | `sync.mappings[]` | — | `{ channel, source, syncVolume?, syncMute? }` |
+| `ui.enabled` | `true` | Sert le dashboard web local |
+| `ui.host` | `127.0.0.1` | Adresse d'écoute du dashboard (`0.0.0.0` pour l'accès LAN) |
+| `ui.port` | `14571` | Port du dashboard (sert aussi de verrou d'instance unique) |
+| `ui.openBrowser` | `false` | Ouvre le dashboard au démarrage (le flag `--open` fait pareil) |
 
 ### Modes de mute
 

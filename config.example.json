@@ -9,6 +9,12 @@
     "url": "ws://127.0.0.1:59650/api",
     "token": null
   },
+  "ui": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 14571,
+    "openBrowser": false
+  },
   "sync": {
     "throttleMs": 50,
     "curveExponent": 1.0,

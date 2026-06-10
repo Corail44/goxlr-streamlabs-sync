@@ -21,6 +21,7 @@ Similar tools exist for OBS Studio ([goxlr-obs-fader-sync](https://github.com/Fr
 - Any GoXLR channel can be mapped to any number of Streamlabs sources
 - Works with the GoXLR Full and GoXLR Mini, and with multiple devices
 - Zero npm dependencies, single small Node.js process, auto-reconnects to both ends
+- Local web dashboard (live volumes, mute states, logs) + windowless launcher — nothing cluttering your taskbar
 - `--list` mode to discover your channels and exact source names
 - `--dry-run` mode to test safely
 
@@ -89,15 +90,17 @@ It prints your GoXLR channels (with live volumes) and every Streamlabs audio sou
 
 ### 3. Run it
 
-Double-click `start.bat`, or:
+**Recommended (no window):** double-click **`start-hidden.vbs`** — the sync runs silently in the background and the dashboard opens in your browser. Double-clicking it again just reopens the dashboard (single instance). Stop it with `stop.bat` or the dashboard's *Quit* button.
 
-```
-npm start
-```
+**With a console:** double-click `start.bat`, or run `npm start`.
 
 Move a fader on the GoXLR — the matching Streamlabs volume slider follows. 🎚️
 
-To launch it automatically with Windows: press `Win+R`, type `shell:startup`, and drop a shortcut to `start.bat` there.
+To launch it automatically with Windows: press `Win+R`, type `shell:startup`, and drop a shortcut to `start-hidden.vbs` there.
+
+### The dashboard
+
+The tool serves a small local web page (no external service, no dependency): connection status of both ends, live channel volumes, mute states, mapped sources and recent logs — plus a *Quit* button. Default address: **http://127.0.0.1:14571**. Set `ui.host` to `"0.0.0.0"` if you want to open it from another device on your network. Closing the tab never stops the sync.
 
 ## Connecting to Streamlabs: pipe vs websocket
 
@@ -125,6 +128,10 @@ With a token configured, `auto` tries the pipe first and falls back to the webso
 | `sync.muteMode` | `follow_stream` | See below |
 | `sync.syncOnConnect` | `true` | Push the full GoXLR state to Streamlabs on (re)connect |
 | `sync.mappings[]` | — | `{ channel, source, syncVolume?, syncMute? }` |
+| `ui.enabled` | `true` | Serve the local web dashboard |
+| `ui.host` | `127.0.0.1` | Dashboard bind address (`0.0.0.0` to allow LAN access) |
+| `ui.port` | `14571` | Dashboard port (also used as the single-instance lock) |
+| `ui.openBrowser` | `false` | Open the dashboard on startup (the `--open` flag does the same) |
 
 ### Mute modes
 

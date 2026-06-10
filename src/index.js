@@ -6,6 +6,7 @@ import { loadConfig, ROOT, CHANNELS } from './config.js';
 import { GoXLRClient } from './goxlr.js';
 import { StreamlabsClient } from './streamlabs.js';
 import { SyncEngine } from './sync.js';
+import { startWebUI, openInBrowser } from './webui.js';
 
 const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 
@@ -18,6 +19,8 @@ Usage:
 Options:
   --config <path>   Use a specific config file (default: ./config.json)
   --list            List GoXLR channels and Streamlabs audio sources, then exit
+  --open            Open the web dashboard in your browser on startup
+  --no-ui           Disable the web dashboard for this run
   --dry-run         Log what would be sent to Streamlabs without sending it
   --verbose         Show debug output
   --help            Show this help
@@ -25,11 +28,13 @@ Options:
 `;
 
 function parseArgs(argv) {
-  const args = { config: null, list: false, dryRun: false, verbose: false };
+  const args = { config: null, list: false, dryRun: false, verbose: false, open: false, noUi: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--config') args.config = argv[++i];
     else if (a === '--list') args.list = true;
+    else if (a === '--open') args.open = true;
+    else if (a === '--no-ui') args.noUi = true;
     else if (a === '--dry-run') args.dryRun = true;
     else if (a === '--verbose') args.verbose = true;
     else if (a === '--help' || a === '-h') {
@@ -129,7 +134,32 @@ async function main() {
 
   const goxlr = new GoXLRClient({ ...cfg.goxlr, logger });
   const slobs = new StreamlabsClient({ ...cfg.streamlabs, logger });
-  new SyncEngine({ goxlr, slobs, config: cfg, logger, dryRun: args.dryRun });
+  const engine = new SyncEngine({ goxlr, slobs, config: cfg, logger, dryRun: args.dryRun });
+
+  // Start the dashboard before connecting: its port doubles as the
+  // single-instance lock (a second launch just reopens the dashboard).
+  if (cfg.ui.enabled && !args.noUi) {
+    try {
+      await startWebUI({
+        cfg,
+        goxlr,
+        slobs,
+        engine,
+        logger,
+        version: VERSION,
+        openBrowser: args.open || cfg.ui.openBrowser,
+      });
+    } catch (e) {
+      if (e.code === 'EADDRINUSE') {
+        const host = cfg.ui.host === '0.0.0.0' ? '127.0.0.1' : cfg.ui.host;
+        const url = `http://${host}:${cfg.ui.port}`;
+        logger.warn(`Already running (dashboard port ${cfg.ui.port} is busy) — opening ${url} instead.`);
+        if (args.open || cfg.ui.openBrowser) openInBrowser(url, logger);
+        process.exit(0);
+      }
+      logger.warn(`[ui] Dashboard failed to start (${e.message}) — continuing without it.`);
+    }
+  }
 
   goxlr.connect();
   slobs.connect();

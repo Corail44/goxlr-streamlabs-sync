@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>goxlr-streamlabs-sync</title>
+<style>
+  :root {
+    --bg: #0e1217; --panel: #161c24; --panel2: #0b0f14; --border: #232c38;
+    --text: #dfe9f2; --muted: #8aa0b5; --ok: #2ecc71; --bad: #e74c3c; --warn: #f1c40f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  h1 { margin: 0; font-size: 16px; font-weight: 600; }
+  h1 .v { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+  #quit { background: transparent; color: var(--bad); border: 1px solid var(--bad); border-radius: 8px; padding: 6px 14px; cursor: pointer; font: inherit; }
+  #quit:hover { background: var(--bad); color: #fff; }
+  .chips { display: flex; gap: 10px; flex-wrap: wrap; padding: 14px 18px 0; }
+  .chip { padding: 6px 14px; border-radius: 999px; background: var(--panel); border: 1px solid var(--border); font-size: 13px; }
+  .chip::before { content: "●"; margin-right: 8px; }
+  .chip.ok::before { color: var(--ok); }
+  .chip.bad::before { color: var(--bad); }
+  #channels { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; padding: 16px 18px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .card .row { display: flex; align-items: center; justify-content: space-between; }
+  .ch-name { font-weight: 600; }
+  .badge { background: var(--bad); color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+  .pct { font-size: 26px; font-weight: 700; margin: 8px 0 6px; }
+  .bar { background: var(--panel2); height: 8px; border-radius: 999px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, #27ae60, #2ecc71); border-radius: 999px; transition: width .12s ease; }
+  .src { margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .src .bad { color: var(--bad); text-decoration: line-through; }
+  details { margin: 4px 18px 18px; }
+  summary { cursor: pointer; color: var(--muted); user-select: none; }
+  #logs { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-top: 8px;
+          max-height: 320px; overflow-y: auto; font: 12px/1.5 Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+  .lg-info { color: #9fb6c9; } .lg-ok { color: var(--ok); } .lg-warn { color: var(--warn); } .lg-error { color: var(--bad); } .lg-debug { color: #5d7286; }
+  footer { padding: 0 18px 18px; color: var(--muted); font-size: 12px; }
+  #overlay { position: fixed; inset: 0; background: rgba(5, 8, 12, .85); display: none; align-items: center; justify-content: center; text-align: center; padding: 24px; }
+  #overlay.show { display: flex; }
+  #overlay .box { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 28px 34px; font-size: 15px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎚️ goxlr-streamlabs-sync<span class="v">v__VERSION__</span></h1>
+  <button id="quit"></button>
+</header>
+<div class="chips">
+  <div class="chip" id="chip-goxlr"></div>
+  <div class="chip" id="chip-slobs"></div>
+</div>
+<main id="channels"></main>
+<details open>
+  <summary id="log-title"></summary>
+  <div id="logs"></div>
+</details>
+<footer id="hint"></footer>
+<div id="overlay"><div class="box" id="overlay-msg"></div></div>
+<script>
+  const FR = (navigator.language || '').toLowerCase().startsWith('fr');
+  const T = FR ? {
+    quit: 'Quitter', confirmQuit: 'Arrêter la synchronisation ?',
+    stopped: 'Sync arrêtée. Tu peux fermer cet onglet.',
+    lost: 'Connexion au dashboard perdue — reconnexion en cours…',
+    logs: 'Journal', muted: 'MUTE',
+    connected: 'connecté', disconnected: 'déconnecté',
+    via: 'via', hint: 'Fermer cet onglet ne stoppe pas la sync — elle tourne en arrière-plan.',
+  } : {
+    quit: 'Quit', confirmQuit: 'Stop the synchronization?',
+    stopped: 'Sync stopped. You can close this tab.',
+    lost: 'Dashboard connection lost — reconnecting…',
+    logs: 'Logs', muted: 'MUTED',
+    connected: 'connected', disconnected: 'disconnected',
+    via: 'via', hint: 'Closing this tab does not stop the sync — it keeps running in the background.',
+  };
+
+  const $ = (s) => document.querySelector(s);
+  $('#quit').textContent = T.quit;
+  $('#log-title').textContent = T.logs;
+  $('#hint').textContent = T.hint;
+
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const hhmmss = (t) => new Date(t).toTimeString().slice(0, 8);
+
+  let quitRequested = false;
+  let logsInit = false;
+
+  function chip(el, ok, label) {
+    el.className = 'chip ' + (ok ? 'ok' : 'bad');
+    el.textContent = label;
+  }
+
+  function renderState(s) {
+    chip($('#chip-goxlr'), s.goxlr.connected,
+      'GoXLR ' + (s.goxlr.connected ? T.connected + (s.goxlr.device ? ' · ' + s.goxlr.device : '') : T.disconnected));
+    chip($('#chip-slobs'), s.streamlabs.connected,
+      'Streamlabs ' + (s.streamlabs.connected ? T.connected + ' ' + T.via + ' ' + s.streamlabs.mode : T.disconnected));
+
+    $('#channels').innerHTML = s.channels.map((c) => `
+      <div class="card">
+        <div class="row"><span class="ch-name">${esc(c.channel)}</span>${c.muted ? `<span class="badge">${T.muted}</span>` : ''}</div>
+        <div class="pct">${c.volume == null ? '—' : Math.round(c.volume / 255 * 100) + ' %'}</div>
+        <div class="bar"><i style="width:${c.volume == null ? 0 : c.volume / 255 * 100}%"></i></div>
+        <div class="src">${c.sources.map((x) => `<span class="${x.resolved ? '' : 'bad'}">→ ${esc(x.name)}</span>`).join('<br>')}</div>
+      </div>`).join('');
+
+    if (!logsInit) {
+      logsInit = true;
+      $('#logs').innerHTML = '';
+      for (const l of s.logs) addLog(l);
+    }
+  }
+
+  function addLog(l) {
+    const el = document.createElement('div');
+    el.className = 'lg-' + l.level;
+    el.textContent = `[${hhmmss(l.t)}] ${l.msg}`;
+    const box = $('#logs');
+    const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+    box.appendChild(el);
+    while (box.childNodes.length > 300) box.removeChild(box.firstChild);
+    if (stick) box.scrollTop = box.scrollHeight;
+  }
+
+  function showOverlay(msg) {
+    $('#overlay-msg').textContent = msg;
+    $('#overlay').classList.add('show');
+  }
+
+  $('#quit').addEventListener('click', () => {
+    if (!confirm(T.confirmQuit)) return;
+    quitRequested = true;
+    fetch('/api/quit', { method: 'POST' }).finally(() => showOverlay(T.stopped));
+  });
+
+  const es = new EventSource('/api/events');
+  es.addEventListener('state', (e) => {
+    if (!quitRequested) $('#overlay').classList.remove('show');
+    renderState(JSON.parse(e.data));
+  });
+  es.addEventListener('log', (e) => addLog(JSON.parse(e.data)));
+  es.onerror = () => {
+    if (!quitRequested) showOverlay(T.lost); // EventSource reconnects on its own
+  };
+</script>
+</body>
+</html>

@@ -39,6 +39,12 @@ const DEFAULTS = {
     syncOnConnect: true,
     mappings: [],
   },
+  ui: {
+    enabled: true,
+    host: '127.0.0.1',
+    port: 14571,
+    openBrowser: false,
+  },
 };
 
 export function defaultConfig() {
@@ -70,6 +76,7 @@ export function loadConfig(explicitPath, { optional = false } = {}) {
     goxlr: { ...DEFAULTS.goxlr, ...raw.goxlr },
     streamlabs: { ...DEFAULTS.streamlabs, ...raw.streamlabs },
     sync: { ...DEFAULTS.sync, ...raw.sync },
+    ui: { ...DEFAULTS.ui, ...raw.ui },
   };
 
   const s = cfg.sync;
@@ -94,6 +101,15 @@ export function loadConfig(explicitPath, { optional = false } = {}) {
   }
   if (!TRANSPORTS.includes(cfg.streamlabs.transport)) {
     throw new Error(`config: streamlabs.transport must be one of: ${TRANSPORTS.join(', ')}`);
+  }
+  if (typeof cfg.ui.enabled !== 'boolean' || typeof cfg.ui.openBrowser !== 'boolean') {
+    throw new Error('config: ui.enabled and ui.openBrowser must be booleans');
+  }
+  if (!Number.isInteger(cfg.ui.port) || cfg.ui.port < 1 || cfg.ui.port > 65535) {
+    throw new Error('config: ui.port must be an integer between 1 and 65535');
+  }
+  if (typeof cfg.ui.host !== 'string' || !cfg.ui.host.trim()) {
+    throw new Error('config: ui.host must be a non-empty string');
   }
 
   return { cfg, file };
