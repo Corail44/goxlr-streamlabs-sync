@@ -3,6 +3,76 @@ import net from 'node:net';
 
 const BACKOFF_MAX = 15000;
 
+// One-shot token check: opens a throwaway websocket to Streamlabs,
+// authenticates, then closes. Never touches the main client connection.
+export function testStreamlabsToken({ url = 'ws://127.0.0.1:59650/api', token, timeoutMs = 6000 }) {
+  return new Promise((resolve) => {
+    if (!token) return resolve({ ok: false, error: 'no token configured' });
+    const base = url.replace(/\/+$/, '');
+    let ws = null;
+    let settled = false;
+    let framed = false;
+    let first = true;
+    const done = (r) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(t);
+      try {
+        ws?.close();
+      } catch {}
+      resolve(r);
+    };
+    const t = setTimeout(() => done({ ok: false, error: 'timeout: websocket unreachable (is "Allow third-party connections" enabled in Streamlabs Remote Control settings?)' }), timeoutMs);
+    const send = (obj) => {
+      const s = JSON.stringify(obj);
+      ws.send(framed ? JSON.stringify([s]) : s);
+    };
+    const auth = () => send({ jsonrpc: '2.0', id: 1, method: 'auth', params: { resource: 'TcpServerService', args: [token] } });
+    try {
+      ws = new WebSocket(`${base}/websocket`);
+    } catch (e) {
+      return done({ ok: false, error: e.message });
+    }
+    ws.addEventListener('open', () => {
+      if (!framed) auth();
+    });
+    ws.addEventListener('message', (ev) => {
+      const raw = typeof ev.data === 'string' ? ev.data : ev.data.toString();
+      if (first && raw === 'o') {
+        first = false;
+        framed = true;
+        auth();
+        return;
+      }
+      first = false;
+      let payloads = [raw];
+      if (framed) {
+        if (raw === 'h') return;
+        if (!raw.startsWith('a')) return;
+        try {
+          payloads = JSON.parse(raw.slice(1));
+        } catch {
+          return;
+        }
+      }
+      for (const p of payloads) {
+        let msg;
+        try {
+          msg = JSON.parse(p);
+        } catch {
+          continue;
+        }
+        if (msg.id === 1) {
+          if (msg.error) done({ ok: false, error: msg.error.message ?? 'invalid token' });
+          else done({ ok: true });
+        }
+      }
+    });
+    ws.addEventListener('close', () => done({ ok: false, error: 'connection closed: websocket unreachable or token rejected' }));
+    ws.addEventListener('error', () => {});
+  });
+}
+
 // JSON-RPC 2.0 client for Streamlabs Desktop.
 //
 // Two transports:

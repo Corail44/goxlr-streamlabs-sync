@@ -141,6 +141,8 @@
     <div class="set-row">
       <label id="lb-token"></label>
       <input type="password" id="token" style="min-width:280px" autocomplete="off">
+      <button class="x" id="token-test"></button>
+      <span class="small" id="token-result" style="margin-top:0"></span>
     </div>
     <div class="set-row" style="margin-top:-4px">
       <label></label>
@@ -186,6 +188,8 @@
       token: 'Token API Streamlabs',
       tokenSet: 'Configuré. Laisser vide pour le conserver.',
       tokenUnset: 'Non configuré (optionnel).',
+      tokenTest: 'Tester',
+      tokenOk: 'Token valide : connexion websocket et authentification réussies.',
       tokenHint: "Dans Streamlabs : Paramètres, Remote Control, clic sur le QR code, Show details. Sert de secours quand le pipe local est indisponible.",
       mappings: 'Mappings canal vers source',
       add: 'Ajouter un mapping',
@@ -217,6 +221,8 @@
       token: 'Streamlabs API token',
       tokenSet: 'Configured. Leave empty to keep it.',
       tokenUnset: 'Not configured (optional).',
+      tokenTest: 'Test',
+      tokenOk: 'Token valid: websocket connection and authentication succeeded.',
       tokenHint: 'In Streamlabs: Settings, Remote Control, click the QR code, Show details. Used as a fallback when the local pipe is unavailable.',
       mappings: 'Channel to source mappings',
       add: 'Add a mapping',
@@ -256,6 +262,7 @@
   $('#lb-autostart').textContent = T.autostart;
   $('#lb-mutemode').textContent = T.muteMode;
   $('#lb-token').textContent = T.token;
+  $('#token-test').textContent = T.tokenTest;
   $('#token-hint').textContent = T.tokenHint;
   $('#lb-mappings').textContent = T.mappings;
   $('#lb-add').textContent = T.add;
@@ -377,6 +384,29 @@
   $('#map-add').addEventListener('click', () => {
     $('#map-rows').appendChild(mapRow(channelsList[0] || 'Mic', ''));
     refreshSources();
+  });
+
+  $('#token-test').addEventListener('click', async () => {
+    const el = $('#token-result');
+    el.style.color = 'var(--dim)';
+    el.textContent = '...';
+    try {
+      const r = await fetch('/api/test-token', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token: $('#token').value.trim() }),
+      }).then((x) => x.json());
+      if (r.ok) {
+        el.style.color = 'var(--led)';
+        el.textContent = T.tokenOk;
+      } else {
+        el.style.color = 'var(--red)';
+        el.textContent = r.error;
+      }
+    } catch (e) {
+      el.style.color = 'var(--red)';
+      el.textContent = e.message;
+    }
   });
 
   $('#autostart').addEventListener('change', async (e) => {

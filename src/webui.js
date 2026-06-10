@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { readAssetText, readAssetBuffer } from './assets.js';
 import { CHANNELS, defaultConfigPath, mergeWithDefaults, saveConfigFile, validateConfig } from './config.js';
 import { getAutostart, setAutostart } from './autostart.js';
+import { testStreamlabsToken } from './streamlabs.js';
 
 export function openInBrowser(url, logger) {
   const [cmd, args] =
@@ -186,6 +187,15 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
         }
       } else if (req.method === 'POST' && url === '/api/config') {
         await handleConfigSave(req, res);
+      } else if (req.method === 'POST' && url === '/api/test-token') {
+        let body = {};
+        try {
+          body = JSON.parse((await readBody(req)) || '{}');
+        } catch {}
+        const token = (typeof body.token === 'string' && body.token.trim()) || cfg.streamlabs.token;
+        const result = await testStreamlabsToken({ url: cfg.streamlabs.url, token });
+        logger.info(`[ui] Token test: ${result.ok ? 'OK (websocket + auth)' : `failed (${result.error})`}`);
+        json(res, 200, result);
       } else if (req.method === 'GET' && url === '/api/events') {
         res.writeHead(200, {
           'content-type': 'text/event-stream',
