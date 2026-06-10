@@ -103,6 +103,8 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       activeMappings: engine.activeSet(),
     },
     submixActive: !!goxlr.snapshotNow?.submixActive,
+    fx: goxlr.snapshotNow?.fx ?? null,
+    sampler: goxlr.snapshotNow?.sampler ?? {},
     channels: [...engine.byChannel.entries()].map(([ch, maps]) => ({
       channel: ch,
       volume: goxlr.snapshotNow?.volumes?.[ch] ?? null,
@@ -124,7 +126,7 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
     }, 100);
   };
 
-  for (const ev of ['ready', 'volume', 'mute', 'submix', 'profile', 'disconnected']) goxlr.on(ev, pushState);
+  for (const ev of ['ready', 'volume', 'mute', 'submix', 'profile', 'fx', 'sampler', 'disconnected']) goxlr.on(ev, pushState);
   slobs.on('connected', pushState);
   slobs.on('disconnected', pushState);
   slobs.on('apiEvent', pushState);
@@ -465,6 +467,50 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
           } else {
             json(res, 400, { error: 'unknown action' });
           }
+        } catch (e) {
+          json(res, 400, { error: e.message });
+        }
+      } else if (req.method === 'POST' && url === '/api/fx') {
+        let body;
+        try {
+          body = JSON.parse(await readBody(req));
+        } catch {
+          return json(res, 400, { error: 'invalid JSON body' });
+        }
+        try {
+          if (typeof body.enabled === 'boolean') {
+            if (!goxlr.setFxEnabled(body.enabled)) throw new Error('GoXLR not connected');
+            logger.info(`[ui] Voice FX ${body.enabled ? 'enabled' : 'disabled'}`);
+          }
+          if (typeof body.preset === 'string') {
+            if (!/^Preset[1-6]$/.test(body.preset)) throw new Error('preset must be Preset1..Preset6');
+            if (!goxlr.setActiveEffectPreset(body.preset)) throw new Error('GoXLR not connected');
+            logger.info(`[ui] FX preset -> ${body.preset}`);
+          }
+          json(res, 200, { ok: true });
+        } catch (e) {
+          json(res, 400, { error: e.message });
+        }
+      } else if (req.method === 'POST' && url === '/api/sample') {
+        let body;
+        try {
+          body = JSON.parse(await readBody(req));
+        } catch {
+          return json(res, 400, { error: 'invalid JSON body' });
+        }
+        const bank = String(body.bank ?? '');
+        const button = String(body.button ?? '');
+        if (!['A', 'B', 'C'].includes(bank)) return json(res, 400, { error: 'bank must be A, B or C' });
+        if (!['TopLeft', 'TopRight', 'BottomLeft', 'BottomRight'].includes(button)) {
+          return json(res, 400, { error: 'invalid sampler button' });
+        }
+        try {
+          const ok = body.stop
+            ? goxlr.stopSample(bank, button)
+            : goxlr.playSample(bank, button, Number.isInteger(body.index) ? body.index : 0);
+          if (!ok) throw new Error('GoXLR not connected');
+          logger.info(`[ui] Sample ${bank}/${button} ${body.stop ? 'stopped' : 'played'}`);
+          json(res, 200, { ok: true });
         } catch (e) {
           json(res, 400, { error: e.message });
         }

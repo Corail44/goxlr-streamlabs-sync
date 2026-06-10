@@ -188,6 +188,23 @@ The mic **cough button** is handled too (counts as a mute on the `Mic` channel).
 - **`Sources not found in Streamlabs`** - the `source` names in `config.json` must match the Streamlabs source names exactly (case-sensitive). Run `node src/index.js --list`.
 - Run with `--verbose` to see every patch and API call, and `--dry-run` to test without touching Streamlabs.
 
+## HTTP API (Stream Deck, macros)
+
+Everything the dashboard does goes through a small local HTTP API, so any tool able to send an HTTP request (Stream Deck plugins, AutoHotkey, Bitfocus Companion...) can drive the sync. JSON bodies, on `http://127.0.0.1:14571`:
+
+| Endpoint | Body | Effect |
+| --- | --- | --- |
+| `POST /api/channel-volume` | `{"channel":"Music","volume":128}` | Sets a channel volume (0-255), the motorized fader moves |
+| `POST /api/channel-mute` | `{"channel":"Music","muted":true}` | Mutes/unmutes the mapped Streamlabs sources |
+| `POST /api/snapshot` | `{"action":"apply","name":"Pause"}` | Applies a mix with the fade |
+| `POST /api/fx` | `{"enabled":true}` or `{"preset":"Preset3"}` | Voice FX on/off, preset switch |
+| `POST /api/sample` | `{"bank":"A","button":"TopLeft"}` | Plays a sampler pad (add `"stop":true` to stop) |
+| `GET /api/state` | - | Full live state as JSON |
+
+With a PIN configured, remote requests need the `gss-auth=<pin>` cookie (localhost never does).
+
+Tip: the dashboard also works through Tailscale or any VPN that reaches your PC, so your phone can drive the mix from anywhere, not just your home Wi-Fi.
+
 ## Contributing
 
 Issues and PRs welcome! The codebase is intentionally small and dependency-free:

@@ -79,6 +79,22 @@ export class GoXLRClient extends EventEmitter {
     return this.setVolume(channel, volume);
   }
 
+  setFxEnabled(enabled) {
+    return this.#command({ SetFXEnabled: !!enabled });
+  }
+
+  setActiveEffectPreset(preset) {
+    return this.#command({ SetActiveEffectPreset: preset });
+  }
+
+  playSample(bank, button, index = 0) {
+    return this.#command({ PlaySampleByIndex: [bank, button, index] });
+  }
+
+  stopSample(bank, button) {
+    return this.#command({ StopSamplePlayback: [bank, button] });
+  }
+
   #onClose() {
     if (this.pingTimer) clearInterval(this.pingTimer);
     this.pingTimer = null;
@@ -176,6 +192,8 @@ export class GoXLRClient extends EventEmitter {
       const b = JSON.stringify(prev.mutes[ch] ?? []);
       if (a !== b) this.emit('mute', ch, snap.mutes[ch] ?? []);
     }
+    if (JSON.stringify(snap.fx) !== JSON.stringify(prev.fx)) this.emit('fx', snap.fx);
+    if (JSON.stringify(snap.sampler) !== JSON.stringify(prev.sampler)) this.emit('sampler', snap.sampler);
   }
 
   // snapshot = { volumes, mutes, submixActive }
@@ -204,7 +222,26 @@ export class GoXLRClient extends EventEmitter {
     }
     const cough = m?.cough_button;
     if (cough) add('Mic', cough.state, cough.mute_type);
-    return { volumes, mutes, submixActive, profileName: m?.profile_name ?? null };
+
+    // Voice FX (GoXLR Full only) and sampler pads that actually hold samples.
+    const fxSrc = m?.effects;
+    const fx = fxSrc
+      ? { enabled: !!fxSrc.is_enabled, active: fxSrc.active_preset ?? null, names: { ...(fxSrc.preset_names ?? {}) } }
+      : null;
+    const sampler = {};
+    for (const [bank, btns] of Object.entries(m?.sampler?.banks ?? {})) {
+      for (const [btn, data] of Object.entries(btns ?? {})) {
+        const count = data?.samples?.length ?? 0;
+        if (!count) continue;
+        (sampler[bank] ??= {})[btn] = {
+          count,
+          playing: !!data.is_playing,
+          name: data.samples[0]?.name ?? `${bank}/${btn}`,
+        };
+      }
+    }
+
+    return { volumes, mutes, submixActive, profileName: m?.profile_name ?? null, fx, sampler };
   }
 
   get snapshotNow() {

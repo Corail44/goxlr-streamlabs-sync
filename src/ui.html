@@ -112,9 +112,12 @@
           font: 12px/1.55 Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
   .lg-info { color: #8da3b5; } .lg-ok { color: var(--led); } .lg-warn { color: var(--amber); } .lg-error { color: var(--red); } .lg-debug { color: #57626d; }
 
-  /* Mix snapshot chips */
-  #mixbar { display: none; flex-wrap: wrap; gap: 8px; padding: 0 18px 4px; align-items: center; }
-  #mixbar .bar-label { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dim); margin-right: 4px; }
+  /* Mix / FX / sampler chip bars */
+  #mixbar, #fxbar, #samplerbar { display: none; flex-wrap: wrap; gap: 8px; padding: 0 18px 4px; align-items: center; }
+  .bar-label { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dim); margin-right: 4px; }
+  .mix-chip.fx-on { background: #1f5237; border-color: var(--led); color: var(--led); }
+  .mix-chip.fx-active { border-color: var(--amber); color: var(--amber); }
+  .mix-chip.playing { background: var(--red); border-color: var(--red); color: #fff; }
   .mix-chip { display: inline-flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line);
               border-radius: 4px; padding: 7px 12px; cursor: pointer; font: 600 12px "Segoe UI", sans-serif; color: var(--text); user-select: none; }
   .mix-chip:hover { border-color: var(--led); color: var(--led); }
@@ -186,6 +189,8 @@
 <div id="onboarding"></div>
 <main id="console"></main>
 <div id="mixbar"></div>
+<div id="fxbar"></div>
+<div id="samplerbar"></div>
 <div id="mix-editor">
   <div class="me-head" id="me-title"></div>
   <div id="me-rows"></div>
@@ -545,6 +550,37 @@
     mb.innerHTML = `<span class="bar-label">${esc(T.mixes)}</span>` +
       (s.snapshots || []).map((n) => `<span class="mix-chip" data-mix="${esc(n)}">${esc(n)}<span class="edit" title="${esc(T.mixEditTip)}">&#8230;</span><span class="del" title="${esc(T.mixDelete(n))}">&#215;</span></span>`).join('') +
       `<span class="mix-chip add" id="mix-add">+ ${esc(T.mixAdd)}</span>`;
+
+    // Voice FX bar (GoXLR Full)
+    const fx = s.fx;
+    const fb = $('#fxbar');
+    if (fx && fx.names && Object.keys(fx.names).length) {
+      fb.style.display = 'flex';
+      const order = ['Preset1', 'Preset2', 'Preset3', 'Preset4', 'Preset5', 'Preset6'];
+      fb.innerHTML = `<span class="bar-label">FX</span>
+        <span class="mix-chip${fx.enabled ? ' fx-on' : ''}" id="fx-toggle">${fx.enabled ? 'ON' : 'OFF'}</span>` +
+        order.filter((k) => fx.names[k]).map((k) =>
+          `<span class="mix-chip fx-preset${fx.active === k ? ' fx-active' : ''}" data-preset="${k}">${esc(fx.names[k])}</span>`).join('');
+    } else {
+      fb.style.display = 'none';
+    }
+
+    // Sampler pads (only buttons that hold samples)
+    const sp = s.sampler ?? {};
+    const sb = $('#samplerbar');
+    const pads = [];
+    for (const bank of ['A', 'B', 'C']) {
+      for (const [btn, d] of Object.entries(sp[bank] ?? {})) pads.push({ bank, btn, ...d });
+    }
+    if (pads.length) {
+      sb.style.display = 'flex';
+      sb.innerHTML = `<span class="bar-label">Sampler</span>` + pads.map((p) => {
+        const label = p.name.length > 18 ? p.name.slice(0, 17) + '~' : p.name;
+        return `<span class="mix-chip pad${p.playing ? ' playing' : ''}" data-bank="${p.bank}" data-btn="${esc(p.btn)}" data-playing="${p.playing ? 1 : 0}" data-count="${p.count}">${esc(label)}<small style="color:${p.playing ? '#fff' : 'var(--dim)'}">&nbsp;${p.bank}</small></span>`;
+      }).join('');
+    } else {
+      sb.style.display = 'none';
+    }
 
     const allUnresolved = s.channels.length > 0 && s.streamlabs.connected &&
       s.channels.every((c) => c.sources.every((x) => !x.resolved));
@@ -921,6 +957,30 @@
       st.style.color = 'var(--red)';
       st.textContent = err.message;
     }
+  });
+
+  // --- FX and sampler bars ---------------------------------------------------
+  $('#fxbar').addEventListener('click', (e) => {
+    if (e.target.closest('#fx-toggle')) {
+      const on = !!lastState?.fx?.enabled;
+      fetch('/api/fx', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: !on }) }).catch(() => {});
+      return;
+    }
+    const preset = e.target.closest('.fx-preset')?.dataset.preset;
+    if (preset) {
+      fetch('/api/fx', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preset }) }).catch(() => {});
+    }
+  });
+
+  $('#samplerbar').addEventListener('click', (e) => {
+    const pad = e.target.closest('.pad');
+    if (!pad) return;
+    const playing = pad.dataset.playing === '1';
+    const count = parseInt(pad.dataset.count, 10) || 1;
+    const body = { bank: pad.dataset.bank, button: pad.dataset.btn };
+    if (playing) body.stop = true;
+    else body.index = Math.floor(Math.random() * count);
+    fetch('/api/sample', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {});
   });
 
   // --- Mix snapshot chips ----------------------------------------------------
