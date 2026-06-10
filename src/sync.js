@@ -44,6 +44,8 @@ export class SyncEngine {
     this.suppressForwardUntil = new Map(); // channel -> timestamp (reverse echo window)
     this.lastResolve = 0;
     this.resolving = null;
+    this.fadeTimer = null;
+    this.fadeUntil = 0; // while a fade runs (+grace), reverse sync is suspended
 
     goxlr.on('ready', (snap) => {
       this.activeProfile = snap.profileName ?? null;
@@ -288,14 +290,14 @@ export class SyncEngine {
 
     const maps = this.bySource.get(name);
     if (!maps || !this.twoWay) return;
+    if (Date.now() < this.fadeUntil) return; // a fade owns the volumes right now
     const d = model.fader?.deflection;
     if (typeof d !== 'number') return;
 
-    // Ignore echoes of our own forward writes. The value tolerance is wide
-    // enough (1% ~ 2.5 steps) to absorb Streamlabs' 0.5 dB slider
-    // quantization without nudging the hardware back.
+    // Ignore echoes of our own forward writes. The value tolerance absorbs
+    // Streamlabs' 0.5 dB slider quantization without nudging the hardware.
     const last = this.lastSentToSlobs.get(name);
-    if (last && (Math.abs(last.d - d) < 0.01 || Date.now() - last.ts < 1200)) return;
+    if (last && (Math.abs(last.d - d) < 0.015 || Date.now() - last.ts < 1200)) return;
 
     const v = this.goxlrVolume(d);
     for (const m of maps) {
@@ -361,10 +363,11 @@ export class SyncEngine {
       if (this.byChannel.has(ch)) this.setSourcesMuted(ch, m).catch(() => {});
     }
 
-    if (this.fadeTimer) {
-      clearInterval(this.fadeTimer);
-      this.fadeTimer = null;
-    }
+    this.cancelFade();
+    // The forward writes of the fade make Streamlabs emit a storm of echo
+    // events, some arriving late and quantized: keep the reverse path out
+    // of the way for the whole fade plus a grace period.
+    this.fadeUntil = Date.now() + dur + 1500;
     const start = {};
     const targets = {};
     for (const [ch, v] of Object.entries(snap.volumes ?? {})) {
@@ -389,6 +392,14 @@ export class SyncEngine {
     };
     step();
     if (dur > 0) this.fadeTimer = setInterval(step, 50);
+  }
+
+  cancelFade() {
+    if (this.fadeTimer) {
+      clearInterval(this.fadeTimer);
+      this.fadeTimer = null;
+    }
+    this.fadeUntil = 0;
   }
 
   // Streamlabs scene change: apply the mapped snapshot, if any.
@@ -416,6 +427,7 @@ export class SyncEngine {
     if (!this.byChannel.has(channel)) throw new Error(`no mapping for channel ${channel}`);
     const v = Math.max(0, Math.min(255, Math.round(Number(volume))));
     if (!Number.isFinite(v)) throw new Error('invalid volume');
+    this.cancelFade(); // a manual gesture takes over any running fade
     if (!this.goxlr.setEffectiveVolume(channel, v)) throw new Error('GoXLR not connected');
     this.log.debug(`[sync] Dashboard fader: GoXLR ${channel} -> ${v}`);
   }

@@ -120,6 +120,14 @@
   .mix-chip:hover { border-color: var(--led); color: var(--led); }
   .mix-chip .del { color: var(--dim); font-size: 11px; padding: 0 2px; }
   .mix-chip .del:hover { color: var(--red); }
+  .mix-chip .edit { color: var(--dim); font-size: 13px; padding: 0 2px; line-height: 0; }
+  .mix-chip .edit:hover { color: var(--amber); }
+  #mix-editor { display: none; margin: 0 18px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 14px 16px; }
+  #mix-editor .me-head { font-weight: 600; margin-bottom: 8px; }
+  .me-row { display: flex; align-items: center; gap: 12px; margin: 5px 0; }
+  .me-row .ch { min-width: 90px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
+  input[type=number] { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font: 13px "Segoe UI", sans-serif; width: 80px; }
+  input[type=number]:focus { outline: none; border-color: var(--led); }
   .mix-chip.add { color: var(--dim); font-weight: 400; }
   .mix-chip.add:hover { border-color: var(--led); color: var(--led); }
 
@@ -178,6 +186,15 @@
 <div id="onboarding"></div>
 <main id="console"></main>
 <div id="mixbar"></div>
+<div id="mix-editor">
+  <div class="me-head" id="me-title"></div>
+  <div id="me-rows"></div>
+  <div class="set-row" style="margin-top:10px">
+    <button class="btn" id="me-save"></button>
+    <button class="btn ghost" id="me-close"></button>
+    <span id="me-status" class="small" style="margin-top:0"></span>
+  </div>
+</div>
 
 <details id="settings-wrap">
   <summary id="settings-title"></summary>
@@ -331,6 +348,10 @@
       mixAdd: 'Enregistrer le mix actuel',
       mixName: 'Nom du mix (volumes et mutes actuels) :',
       mixDelete: (n) => `Supprimer le mix « ${n} » ?`,
+      mixEditTip: 'Modifier les valeurs du mix',
+      mixEditTitle: (n) => `Édition du mix « ${n} »`,
+      mixInclude: 'Inclus dans le mix',
+      close: 'Fermer',
       pin: "PIN d'accès réseau",
       pinSet: 'Configuré. Vide pour conserver, OFF pour retirer.',
       pinUnset: '4 à 8 chiffres (optionnel). Protège l\'accès depuis le réseau.',
@@ -401,6 +422,10 @@
       mixAdd: 'Save current mix',
       mixName: 'Mix name (current volumes and mutes):',
       mixDelete: (n) => `Delete the mix "${n}"?`,
+      mixEditTip: 'Edit the mix values',
+      mixEditTitle: (n) => `Editing mix "${n}"`,
+      mixInclude: 'Included in the mix',
+      close: 'Close',
       pin: 'Network access PIN',
       pinSet: 'Configured. Empty keeps it, OFF removes it.',
       pinUnset: '4 to 8 digits (optional). Protects network access.',
@@ -469,6 +494,8 @@
   $('#lb-rule-add').textContent = T.ruleAdd;
   $('#pin-title').textContent = T.pinTitle;
   $('#pin-go').textContent = T.pinGo;
+  $('#me-save').textContent = T.save;
+  $('#me-close').textContent = T.close;
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const hhmmss = (t) => new Date(t).toTimeString().slice(0, 8);
@@ -516,7 +543,7 @@
     const mb = $('#mixbar');
     mb.style.display = s.channels.length ? 'flex' : 'none';
     mb.innerHTML = `<span class="bar-label">${esc(T.mixes)}</span>` +
-      (s.snapshots || []).map((n) => `<span class="mix-chip" data-mix="${esc(n)}">${esc(n)}<span class="del" title="${esc(T.mixDelete(n))}">&#215;</span></span>`).join('') +
+      (s.snapshots || []).map((n) => `<span class="mix-chip" data-mix="${esc(n)}">${esc(n)}<span class="edit" title="${esc(T.mixEditTip)}">&#8230;</span><span class="del" title="${esc(T.mixDelete(n))}">&#215;</span></span>`).join('') +
       `<span class="mix-chip add" id="mix-add">+ ${esc(T.mixAdd)}</span>`;
 
     const allUnresolved = s.channels.length > 0 && s.streamlabs.connected &&
@@ -826,8 +853,84 @@
     }
   });
 
+  // --- Mix editor ------------------------------------------------------------
+  let editingMix = null;
+
+  function openMixEditor(name) {
+    const data = lastState?.snapshotData?.[name];
+    if (!data) return;
+    editingMix = name;
+    $('#me-title').textContent = T.mixEditTitle(name);
+    $('#me-status').textContent = '';
+    const rows = $('#me-rows');
+    rows.innerHTML = '';
+    for (const c of lastState?.channels ?? []) {
+      const ch = c.channel;
+      const included = (data.volumes && ch in data.volumes) || (data.muted && ch in data.muted);
+      const pct = data.volumes && ch in data.volumes
+        ? Math.round(data.volumes[ch] / 255 * 100)
+        : (c.volume == null ? 50 : Math.round(c.volume / 255 * 100));
+      const mut = !!(data.muted && data.muted[ch]);
+      const row = document.createElement('div');
+      row.className = 'me-row';
+      row.dataset.channel = ch;
+      row.innerHTML = `
+        <input type="checkbox" class="me-inc" title="${esc(T.mixInclude)}" ${included ? 'checked' : ''}>
+        <span class="ch">${esc(ch)}</span>
+        <input type="number" class="me-vol" min="0" max="100" step="1" value="${pct}">
+        <span class="small" style="margin:0">%</span>
+        <label class="small" style="margin:0; display:flex; align-items:center; gap:6px">
+          <input type="checkbox" class="me-mut" ${mut ? 'checked' : ''}> ${esc(T.muted)}
+        </label>`;
+      rows.appendChild(row);
+    }
+    $('#mix-editor').style.display = 'block';
+    $('#mix-editor').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  $('#me-close').addEventListener('click', () => {
+    editingMix = null;
+    $('#mix-editor').style.display = 'none';
+  });
+
+  $('#me-save').addEventListener('click', async () => {
+    if (!editingMix) return;
+    const volumes = {};
+    const muted = {};
+    for (const row of document.querySelectorAll('#me-rows .me-row')) {
+      if (!row.querySelector('.me-inc').checked) continue;
+      const ch = row.dataset.channel;
+      const pct = Math.max(0, Math.min(100, parseInt(row.querySelector('.me-vol').value, 10) || 0));
+      volumes[ch] = Math.round(pct * 255 / 100);
+      muted[ch] = row.querySelector('.me-mut').checked;
+    }
+    const st = $('#me-status');
+    st.style.color = 'var(--dim)';
+    st.textContent = '...';
+    try {
+      const r = await fetch('/api/snapshot', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'update', name: editingMix, volumes, muted }),
+      }).then((x) => x.json());
+      if (r.error) throw new Error(r.error);
+      st.style.color = 'var(--led)';
+      st.textContent = T.saved;
+      setTimeout(() => { st.textContent = ''; }, 3000);
+    } catch (err) {
+      st.style.color = 'var(--red)';
+      st.textContent = err.message;
+    }
+  });
+
   // --- Mix snapshot chips ----------------------------------------------------
   $('#mixbar').addEventListener('click', async (e) => {
+    const edit = e.target.closest('.edit');
+    if (edit) {
+      const name = edit.closest('.mix-chip')?.dataset.mix;
+      if (name) openMixEditor(name);
+      return;
+    }
     const del = e.target.closest('.del');
     if (del) {
       const name = del.closest('.mix-chip')?.dataset.mix;

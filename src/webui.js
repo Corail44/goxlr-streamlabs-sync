@@ -93,6 +93,7 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       sceneRules: cfg.sync.sceneRules ?? {},
     },
     snapshots: Object.keys(cfg.sync.snapshots ?? {}),
+    snapshotData: cfg.sync.snapshots ?? {},
     live,
     lan: { enabled: cfg.ui.host === '0.0.0.0', urls: lanUrls() },
     profile: {
@@ -434,6 +435,21 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
               next.sync.snapshots[name] = snap;
             });
             logger.ok(`[ui] Mix "${name}" saved (${Object.keys(snap.volumes).length} channel(s))`);
+            pushState();
+            json(res, 200, { ok: true });
+          } else if (body.action === 'update') {
+            const volumes = {};
+            const muted = {};
+            for (const [ch, v] of Object.entries(body.volumes ?? {})) {
+              const n = Math.round(Number(v));
+              if (Number.isFinite(n)) volumes[ch] = Math.max(0, Math.min(255, n));
+            }
+            for (const [ch, m] of Object.entries(body.muted ?? {})) muted[ch] = !!m;
+            persist((next) => {
+              if (!next.sync.snapshots[name]) throw new Error(`unknown mix "${name}"`);
+              next.sync.snapshots[name] = { volumes, muted };
+            });
+            logger.ok(`[ui] Mix "${name}" updated (${Object.keys(volumes).length} channel(s))`);
             pushState();
             json(res, 200, { ok: true });
           } else if (body.action === 'delete') {
