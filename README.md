@@ -123,7 +123,7 @@ By default (`"transport": "auto"`), the tool connects through Streamlabs' local 
 **Known Streamlabs quirk:** the pipe listener is single-use. If a client disconnects (e.g. you stop this tool), Streamlabs does not recreate the pipe until it restarts. So if you restart the sync while Streamlabs stays open, the pipe will be unavailable. Two options:
 
 - restart Streamlabs Desktop, or
-- set a **token** so the tool can fall back to the websocket: in Streamlabs go to *Settings → Remote Control*, click the QR code, *Show details*, copy the API token into `streamlabs.token` in `config.json`.
+- set a **token** so the tool can fall back to the websocket: in Streamlabs go to *Settings, Remote Control*, enable **Allow third-party connections**, then copy the API token shown there. Paste it in the dashboard settings (a *Test* button validates it live); the websocket host and port are editable there too, in case you changed the port in Streamlabs.
 
 With a token configured, `auto` tries the pipe first and falls back to the websocket seamlessly.
 

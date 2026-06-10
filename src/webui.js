@@ -43,6 +43,11 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
   const clients = new Set();
   let cfgFile = configFile;
 
+  const parseSlobsUrl = () => {
+    const m = /^wss?:\/\/([^:/]+):(\d+)/.exec(cfg.streamlabs.url) ?? [];
+    return { host: m[1] ?? '127.0.0.1', port: Number(m[2] ?? 59650) };
+  };
+
   const state = () => ({
     version,
     configFile: cfgFile,
@@ -54,7 +59,13 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
       device: goxlr.status?.mixers?.[goxlr.serial]?.hardware?.device_type ?? null,
     },
     streamlabs: { connected: slobs.connected, mode: slobs.connected ? slobs.mode : null },
-    settings: { muteMode: cfg.sync.muteMode, mappings: cfg.sync.mappings, hasToken: !!cfg.streamlabs.token },
+    settings: {
+      muteMode: cfg.sync.muteMode,
+      mappings: cfg.sync.mappings,
+      hasToken: !!cfg.streamlabs.token,
+      slobsHost: parseSlobsUrl().host,
+      slobsPort: parseSlobsUrl().port,
+    },
     channels: [...engine.byChannel.entries()].map(([ch, maps]) => ({
       channel: ch,
       volume: goxlr.snapshotNow?.volumes?.[ch] ?? null,
@@ -119,6 +130,19 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
     const newToken = typeof body.token === 'string' ? body.token.trim() : '';
     if (newToken) next.streamlabs.token = newToken;
 
+    // Optional websocket host/port override (Streamlabs lets users change them).
+    const reqHost = typeof body.slobsHost === 'string' ? body.slobsHost.trim() : '';
+    const reqPort = body.slobsPort != null && body.slobsPort !== '' ? Number(body.slobsPort) : null;
+    if (reqHost || reqPort != null) {
+      const cur = parseSlobsUrl();
+      const host = reqHost || cur.host;
+      const port = reqPort ?? cur.port;
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        return json(res, 400, { error: 'invalid Streamlabs port' });
+      }
+      next.streamlabs.url = `ws://${host}:${port}/api`;
+    }
+
     try {
       validateConfig(next);
     } catch (e) {
@@ -136,6 +160,10 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
     if (newToken) {
       cfg.streamlabs.token = newToken;
       slobs.token = newToken; // used on the next (re)connection
+    }
+    if (next.streamlabs.url !== cfg.streamlabs.url) {
+      cfg.streamlabs.url = next.streamlabs.url;
+      slobs.url = next.streamlabs.url.replace(/\/+$/, '');
     }
     await engine.applySettings({ mappings: next.sync.mappings, muteMode: next.sync.muteMode });
     logger.ok(`[ui] Settings saved to ${target}`);
@@ -193,7 +221,15 @@ export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, vers
           body = JSON.parse((await readBody(req)) || '{}');
         } catch {}
         const token = (typeof body.token === 'string' && body.token.trim()) || cfg.streamlabs.token;
-        const result = await testStreamlabsToken({ url: cfg.streamlabs.url, token });
+        let url = cfg.streamlabs.url;
+        const tHost = typeof body.host === 'string' ? body.host.trim() : '';
+        const tPort = body.port != null && body.port !== '' ? Number(body.port) : null;
+        if (tHost || tPort != null) {
+          const cur = parseSlobsUrl();
+          const port = Number.isInteger(tPort) && tPort >= 1 && tPort <= 65535 ? tPort : cur.port;
+          url = `ws://${tHost || cur.host}:${port}/api`;
+        }
+        const result = await testStreamlabsToken({ url, token });
         logger.info(`[ui] Token test: ${result.ok ? 'OK (websocket + auth)' : `failed (${result.error})`}`);
         json(res, 200, result);
       } else if (req.method === 'GET' && url === '/api/events') {

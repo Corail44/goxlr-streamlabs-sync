@@ -123,7 +123,7 @@ Par défaut (`"transport": "auto"`), l'outil se connecte via le **named pipe** l
 **Particularité connue de Streamlabs :** le listener du pipe est à usage unique. Si un client se déconnecte (ex. tu arrêtes l'outil), Streamlabs ne recrée pas le pipe avant son redémarrage. Si tu relances la sync alors que Streamlabs est resté ouvert, le pipe sera indisponible. Deux options :
 
 - redémarrer Streamlabs Desktop, ou
-- configurer un **token** pour basculer sur le websocket : dans Streamlabs, *Paramètres → Remote Control*, clique sur le QR code, *Show details*, copie le token API dans `streamlabs.token` du `config.json`.
+- configurer un **token** pour basculer sur le websocket : dans Streamlabs, *Paramètres, Remote Control*, active **Autoriser les connexions de tiers**, puis copie le jeton d'API affiché. Colle-le dans les réglages du dashboard (un bouton *Tester* le valide en direct) ; l'adresse et le port du websocket y sont aussi modifiables, si tu as changé le port dans Streamlabs.
 
 Avec un token configuré, `auto` essaie le pipe puis bascule tout seul sur le websocket.
 

@@ -139,6 +139,12 @@
       <select id="mutemode"></select>
     </div>
     <div class="set-row">
+      <label id="lb-slobs-conn"></label>
+      <input type="text" id="slobs-host" style="width:170px" spellcheck="false">
+      <span style="color:var(--dim)">:</span>
+      <input type="text" id="slobs-port" style="width:80px" inputmode="numeric" spellcheck="false">
+    </div>
+    <div class="set-row">
       <label id="lb-token"></label>
       <input type="password" id="token" style="min-width:280px" autocomplete="off">
       <button class="x" id="token-test"></button>
@@ -185,12 +191,13 @@
       autostart: 'Démarrer avec Windows',
       muteMode: 'Comportement des mutes',
       muteModes: { follow_stream: 'Suivre le stream (recommandé)', any: "N'importe quel mute", off: 'Ignorer les mutes' },
-      token: 'Token API Streamlabs',
+      token: 'Jeton API Streamlabs',
       tokenSet: 'Configuré. Laisser vide pour le conserver.',
       tokenUnset: 'Non configuré (optionnel).',
       tokenTest: 'Tester',
-      tokenOk: 'Token valide : connexion websocket et authentification réussies.',
-      tokenHint: "Dans Streamlabs : Paramètres, Remote Control, clic sur le QR code, Show details. Sert de secours quand le pipe local est indisponible.",
+      tokenOk: 'Jeton valide : connexion websocket et authentification réussies.',
+      tokenHint: "Dans Streamlabs : Paramètres, Remote Control, active « Autoriser les connexions de tiers » : le jeton d'API et le port s'affichent. Le websocket sert de secours quand le pipe local est indisponible.",
+      slobsConn: 'Websocket Streamlabs (adresse:port)',
       mappings: 'Mappings canal vers source',
       add: 'Ajouter un mapping',
       save: 'Enregistrer',
@@ -223,7 +230,8 @@
       tokenUnset: 'Not configured (optional).',
       tokenTest: 'Test',
       tokenOk: 'Token valid: websocket connection and authentication succeeded.',
-      tokenHint: 'In Streamlabs: Settings, Remote Control, click the QR code, Show details. Used as a fallback when the local pipe is unavailable.',
+      tokenHint: 'In Streamlabs: Settings, Remote Control, enable "Allow third-party connections": the API token and port appear. The websocket is used as a fallback when the local pipe is unavailable.',
+      slobsConn: 'Streamlabs websocket (host:port)',
       mappings: 'Channel to source mappings',
       add: 'Add a mapping',
       save: 'Save',
@@ -262,6 +270,7 @@
   $('#lb-autostart').textContent = T.autostart;
   $('#lb-mutemode').textContent = T.muteMode;
   $('#lb-token').textContent = T.token;
+  $('#lb-slobs-conn').textContent = T.slobsConn;
   $('#token-test').textContent = T.tokenTest;
   $('#token-hint').textContent = T.tokenHint;
   $('#lb-mappings').textContent = T.mappings;
@@ -371,6 +380,8 @@
       mm.appendChild(o);
     }
     $('#token').placeholder = s.settings.hasToken ? T.tokenSet : T.tokenUnset;
+    $('#slobs-host').value = s.settings.slobsHost || '127.0.0.1';
+    $('#slobs-port').value = s.settings.slobsPort || 59650;
     const rows = $('#map-rows');
     rows.innerHTML = '';
     for (const m of s.settings.mappings) rows.appendChild(mapRow(m.channel, m.source));
@@ -394,7 +405,11 @@
       const r = await fetch('/api/test-token', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ token: $('#token').value.trim() }),
+        body: JSON.stringify({
+          token: $('#token').value.trim(),
+          host: $('#slobs-host').value.trim(),
+          port: $('#slobs-port').value.trim(),
+        }),
       }).then((x) => x.json());
       if (r.ok) {
         el.style.color = 'var(--led)';
@@ -425,7 +440,12 @@
     const mappings = [...document.querySelectorAll('#map-rows .map-row')]
       .map((row) => ({ channel: row.querySelector('select').value, source: row.querySelector('input').value.trim() }))
       .filter((m) => m.source);
-    const body = { mappings, muteMode: $('#mutemode').value };
+    const body = {
+      mappings,
+      muteMode: $('#mutemode').value,
+      slobsHost: $('#slobs-host').value.trim(),
+      slobsPort: $('#slobs-port').value.trim(),
+    };
     const tokenVal = $('#token').value.trim();
     if (tokenVal) body.token = tokenVal;
     const st = $('#save-status');
