@@ -1,0 +1,25 @@
+{
+  "goxlr": {
+    "url": "ws://127.0.0.1:14564/api/websocket",
+    "serial": null
+  },
+  "streamlabs": {
+    "transport": "auto",
+    "pipeName": "slobs",
+    "url": "ws://127.0.0.1:59650/api",
+    "token": null
+  },
+  "sync": {
+    "throttleMs": 50,
+    "curveExponent": 1.0,
+    "muteMode": "follow_stream",
+    "syncOnConnect": true,
+    "mappings": [
+      { "channel": "Mic",    "source": "Mic (GoXLR)" },
+      { "channel": "Music",  "source": "Music (GoXLR)" },
+      { "channel": "Game",   "source": "Game (GoXLR)" },
+      { "channel": "System", "source": "System (GoXLR)" },
+      { "channel": "Chat",   "source": "Chat (GoXLR)" }
+    ]
+  }
+}

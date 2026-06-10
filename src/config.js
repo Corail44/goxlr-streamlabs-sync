@@ -1,0 +1,100 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export const CHANNELS = [
+  'Mic',
+  'LineIn',
+  'Console',
+  'System',
+  'Game',
+  'Chat',
+  'Sample',
+  'Music',
+  'Headphones',
+  'MicMonitor',
+  'LineOut',
+];
+
+const MUTE_MODES = ['follow_stream', 'any', 'off'];
+const TRANSPORTS = ['auto', 'pipe', 'websocket'];
+
+export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+const DEFAULTS = {
+  goxlr: {
+    url: 'ws://127.0.0.1:14564/api/websocket',
+    serial: null,
+  },
+  streamlabs: {
+    transport: 'auto',
+    pipeName: 'slobs',
+    url: 'ws://127.0.0.1:59650/api',
+    token: null,
+  },
+  sync: {
+    throttleMs: 50,
+    curveExponent: 1.0,
+    muteMode: 'follow_stream',
+    syncOnConnect: true,
+    mappings: [],
+  },
+};
+
+export function defaultConfig() {
+  return JSON.parse(JSON.stringify(DEFAULTS));
+}
+
+export function loadConfig(explicitPath, { optional = false } = {}) {
+  const candidates = explicitPath
+    ? [path.resolve(explicitPath)]
+    : [path.resolve(process.cwd(), 'config.json'), path.join(ROOT, 'config.json')];
+  const file = candidates.find((p) => fs.existsSync(p));
+
+  if (!file) {
+    if (optional) return { cfg: defaultConfig(), file: null };
+    throw new Error(
+      `No config.json found (looked at: ${candidates.join(' ; ')})\n` +
+        `  -> Copy "${path.join(ROOT, 'config.example.json')}" to "${path.join(ROOT, 'config.json')}" and edit the mappings.`
+    );
+  }
+
+  let raw;
+  try {
+    raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new Error(`Invalid JSON in ${file}: ${e.message}`);
+  }
+
+  const cfg = {
+    goxlr: { ...DEFAULTS.goxlr, ...raw.goxlr },
+    streamlabs: { ...DEFAULTS.streamlabs, ...raw.streamlabs },
+    sync: { ...DEFAULTS.sync, ...raw.sync },
+  };
+
+  const s = cfg.sync;
+  if (!Array.isArray(s.mappings)) throw new Error('config: sync.mappings must be an array');
+  for (const m of s.mappings) {
+    if (!m || typeof m !== 'object') throw new Error('config: each mapping must be an object');
+    if (!CHANNELS.includes(m.channel)) {
+      throw new Error(`config: unknown channel "${m.channel}". Valid channels: ${CHANNELS.join(', ')}`);
+    }
+    if (typeof m.source !== 'string' || !m.source.trim()) {
+      throw new Error(`config: mapping for channel "${m.channel}" needs a non-empty "source" name`);
+    }
+  }
+  if (!MUTE_MODES.includes(s.muteMode)) {
+    throw new Error(`config: sync.muteMode must be one of: ${MUTE_MODES.join(', ')}`);
+  }
+  if (typeof s.curveExponent !== 'number' || s.curveExponent <= 0) {
+    throw new Error('config: sync.curveExponent must be a number > 0');
+  }
+  if (typeof s.throttleMs !== 'number' || s.throttleMs < 0) {
+    throw new Error('config: sync.throttleMs must be a number >= 0');
+  }
+  if (!TRANSPORTS.includes(cfg.streamlabs.transport)) {
+    throw new Error(`config: streamlabs.transport must be one of: ${TRANSPORTS.join(', ')}`);
+  }
+
+  return { cfg, file };
+}

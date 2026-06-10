@@ -1,0 +1,29 @@
+{
+  "name": "goxlr-streamlabs-sync",
+  "version": "0.1.0",
+  "description": "Sync GoXLR faders & mute buttons to Streamlabs Desktop audio sources in real time (via GoXLR Utility). Perfect companion for multi-track recording.",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "goxlr-streamlabs-sync": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "list": "node src/index.js --list"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "goxlr",
+    "goxlr-utility",
+    "streamlabs",
+    "streamlabs-desktop",
+    "fader",
+    "sync",
+    "audio",
+    "streaming",
+    "multitrack"
+  ],
+  "license": "MIT"
+}
