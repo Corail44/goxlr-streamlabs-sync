@@ -102,6 +102,8 @@
   #save-status { margin-left: 10px; font-size: 13px; }
   .small { color: var(--dim); font-size: 12px; margin-top: 8px; word-break: break-all; }
   .small a { color: var(--led); }
+  .qr-box { display: inline-block; background: #fff; padding: 10px; border-radius: 4px; line-height: 0; }
+  .qr-box svg { display: block; }
 
   /* Logs */
   #logs { background: var(--panel2); border: 1px solid var(--line); border-top: none; border-radius: 0 0 4px 4px;
@@ -175,6 +177,13 @@
       <input type="checkbox" id="lan">
       <span class="small" id="lan-urls" style="margin-top:0"></span>
     </div>
+    <div class="set-row" id="lan-qr-row" style="display:none">
+      <label></label>
+      <div>
+        <div class="qr-box" id="lan-qr"></div>
+        <div class="small" id="lan-qr-url"></div>
+      </div>
+    </div>
     <div class="set-row">
       <label id="lb-mutemode"></label>
       <select id="mutemode"></select>
@@ -227,6 +236,9 @@
 <div id="overlay"><div class="box" id="overlay-msg"></div></div>
 <datalist id="sources-list"></datalist>
 
+<script>
+//__QRLIB__
+</script>
 <script>
   const LANGS = {
     fr: {
@@ -461,12 +473,33 @@
     }
   }
 
+  let lastQrUrl = null;
   function renderLan(s) {
     const lan = s.lan || {};
     $('#lan').checked = !!lan.enabled;
     $('#lan-urls').innerHTML = lan.enabled && lan.urls.length
       ? esc(T.lanOn) + lan.urls.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>`).join(' · ')
       : esc(T.lanOff);
+
+    // QR code for the best LAN URL (prefer the classic home subnets).
+    const best = lan.enabled && lan.urls.length
+      ? lan.urls.find((u) => /http:\/\/(192\.168\.|10\.0\.|10\.1\.)/.test(u)) ?? lan.urls[0]
+      : null;
+    $('#lan-qr-row').style.display = best && typeof qrcode === 'function' ? 'flex' : 'none';
+    if (best && typeof qrcode === 'function' && best !== lastQrUrl) {
+      lastQrUrl = best;
+      try {
+        const qr = qrcode(0, 'M');
+        qr.addData(best);
+        qr.make();
+        $('#lan-qr').innerHTML = qr.createSvgTag({ cellSize: 5, margin: 0, scalable: true });
+        $('#lan-qr').firstChild.style.width = '170px';
+        $('#lan-qr').firstChild.style.height = '170px';
+        $('#lan-qr-url').textContent = best;
+      } catch {
+        $('#lan-qr-row').style.display = 'none';
+      }
+    }
   }
 
   // --- Settings panel -------------------------------------------------------

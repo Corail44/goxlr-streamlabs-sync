@@ -39,6 +39,7 @@ const seaConfig = {
   disableExperimentalSEAWarning: true,
   assets: {
     'src/ui.html': 'src/ui.html',
+    'src/vendor/qrcode-generator.js': 'src/vendor/qrcode-generator.js',
     'assets/icon.ico': 'assets/icon.ico',
   },
 };

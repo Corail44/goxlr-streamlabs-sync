@@ -40,7 +40,15 @@ function readBody(req, limit = 64 * 1024) {
 // No dependencies.
 export function startWebUI({ cfg, configFile, goxlr, slobs, engine, logger, version, getUpdate, openBrowser = false, onRestart = null }) {
   const ui = cfg.ui;
-  const html = readAssetText('src/ui.html').replace('__VERSION__', version);
+  let qrLib = '';
+  try {
+    qrLib = readAssetText('src/vendor/qrcode-generator.js');
+  } catch {
+    logger.debug('[ui] QR library missing, the LAN QR code will not render');
+  }
+  const html = readAssetText('src/ui.html')
+    .replace('__VERSION__', () => version)
+    .replace('//__QRLIB__', () => qrLib);
   const clients = new Set();
   let cfgFile = configFile;
 
