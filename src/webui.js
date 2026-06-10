@@ -1,8 +1,6 @@
 import http from 'node:http';
-import fs from 'node:fs';
-import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { ROOT } from './config.js';
+import { readAssetText, readAssetBuffer } from './assets.js';
 
 export function openInBrowser(url, logger) {
   const [cmd, args] =
@@ -21,9 +19,7 @@ export function openInBrowser(url, logger) {
 // Tiny local dashboard: status page + Server-Sent Events stream. No dependencies.
 export function startWebUI({ cfg, goxlr, slobs, engine, logger, version, openBrowser = false }) {
   const ui = cfg.ui;
-  const html = fs
-    .readFileSync(path.join(ROOT, 'src', 'ui.html'), 'utf8')
-    .replace('__VERSION__', version);
+  const html = readAssetText('src/ui.html').replace('__VERSION__', version);
   const clients = new Set();
 
   const state = () => ({
@@ -68,6 +64,15 @@ export function startWebUI({ cfg, goxlr, slobs, engine, logger, version, openBro
     if (req.method === 'GET' && (url === '/' || url === '/index.html')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       res.end(html);
+    } else if (req.method === 'GET' && url === '/icon.ico') {
+      try {
+        const icon = readAssetBuffer('assets/icon.ico');
+        res.writeHead(200, { 'content-type': 'image/x-icon', 'cache-control': 'max-age=86400' });
+        res.end(icon);
+      } catch {
+        res.writeHead(404);
+        res.end();
+      }
     } else if (req.method === 'GET' && url === '/api/state') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(state()));

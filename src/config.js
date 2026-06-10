@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { IS_SEA, ROOT } from './assets.js';
+
+export { ROOT } from './assets.js';
 
 export const CHANNELS = [
   'Mic',
@@ -18,8 +20,6 @@ export const CHANNELS = [
 
 const MUTE_MODES = ['follow_stream', 'any', 'off'];
 const TRANSPORTS = ['auto', 'pipe', 'websocket'];
-
-export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const DEFAULTS = {
   goxlr: {
@@ -44,8 +44,17 @@ const DEFAULTS = {
     host: '127.0.0.1',
     port: 14571,
     openBrowser: false,
+    tray: true,
   },
 };
+
+const EXAMPLE_MAPPINGS = [
+  { channel: 'Mic', source: 'Mic (GoXLR)' },
+  { channel: 'Music', source: 'Music (GoXLR)' },
+  { channel: 'Game', source: 'Game (GoXLR)' },
+  { channel: 'System', source: 'System (GoXLR)' },
+  { channel: 'Chat', source: 'Chat (GoXLR)' },
+];
 
 export function defaultConfig() {
   return JSON.parse(JSON.stringify(DEFAULTS));
@@ -55,10 +64,25 @@ export function loadConfig(explicitPath, { optional = false } = {}) {
   const candidates = explicitPath
     ? [path.resolve(explicitPath)]
     : [path.resolve(process.cwd(), 'config.json'), path.join(ROOT, 'config.json')];
-  const file = candidates.find((p) => fs.existsSync(p));
+  let file = candidates.find((p) => fs.existsSync(p));
+  let created = false;
+
+  // Packaged .exe first run: create an editable config next to the executable.
+  if (!file && IS_SEA && !explicitPath) {
+    const target = path.join(ROOT, 'config.json');
+    const initial = defaultConfig();
+    initial.sync.mappings = EXAMPLE_MAPPINGS;
+    try {
+      fs.writeFileSync(target, JSON.stringify(initial, null, 2) + '\n');
+      file = target;
+      created = true;
+    } catch {
+      // read-only folder: fall through to the error below
+    }
+  }
 
   if (!file) {
-    if (optional) return { cfg: defaultConfig(), file: null };
+    if (optional) return { cfg: defaultConfig(), file: null, created: false };
     throw new Error(
       `No config.json found (looked at: ${candidates.join(' ; ')})\n` +
         `  -> Copy "${path.join(ROOT, 'config.example.json')}" to "${path.join(ROOT, 'config.json')}" and edit the mappings.`
@@ -102,8 +126,8 @@ export function loadConfig(explicitPath, { optional = false } = {}) {
   if (!TRANSPORTS.includes(cfg.streamlabs.transport)) {
     throw new Error(`config: streamlabs.transport must be one of: ${TRANSPORTS.join(', ')}`);
   }
-  if (typeof cfg.ui.enabled !== 'boolean' || typeof cfg.ui.openBrowser !== 'boolean') {
-    throw new Error('config: ui.enabled and ui.openBrowser must be booleans');
+  if (typeof cfg.ui.enabled !== 'boolean' || typeof cfg.ui.openBrowser !== 'boolean' || typeof cfg.ui.tray !== 'boolean') {
+    throw new Error('config: ui.enabled, ui.openBrowser and ui.tray must be booleans');
   }
   if (!Number.isInteger(cfg.ui.port) || cfg.ui.port < 1 || cfg.ui.port > 65535) {
     throw new Error('config: ui.port must be an integer between 1 and 65535');
@@ -112,5 +136,5 @@ export function loadConfig(explicitPath, { optional = false } = {}) {
     throw new Error('config: ui.host must be a non-empty string');
   }
 
-  return { cfg, file };
+  return { cfg, file, created };
 }

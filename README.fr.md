@@ -21,7 +21,8 @@ Des outils équivalents existent pour OBS Studio ([goxlr-obs-fader-sync](https:/
 - Chaque canal GoXLR peut être mappé vers une ou plusieurs sources Streamlabs
 - Compatible GoXLR Full et Mini, multi-appareils
 - Zéro dépendance npm, un seul petit process Node.js, reconnexion automatique des deux côtés
-- Dashboard web local (volumes en direct, mutes, logs) + lanceur sans fenêtre — rien qui traîne dans ta barre des tâches
+- Dashboard web local (volumes en direct, mutes, logs) et **icône dans la zone de notification** — rien qui traîne dans ta barre des tâches
+- **`.exe` autonome** disponible (aucune installation de Node.js), compilé en toute transparence par GitHub Actions
 - Mode `--list` pour découvrir tes canaux et les noms exacts de tes sources
 - Mode `--dry-run` pour tester sans risque
 
@@ -33,12 +34,27 @@ Des outils équivalents existent pour OBS Studio ([goxlr-obs-fader-sync](https:/
 
 ## Installation
 
+### Option A — exécutable autonome (le plus simple)
+
+Télécharge `goxlr-streamlabs-sync.exe` depuis la [page Releases](../../releases), mets-le dans un dossier à lui, et lance-le. Au premier lancement il crée un `config.json` à côté de l'exe — édite les mappings, relance, c'est fini. Aucune installation de Node.js.
+
+> **À propos de Windows SmartScreen :** l'exe n'est pas signé numériquement (les certificats coûtent cher pour un outil communautaire gratuit), donc le premier lancement peut afficher *« Windows a protégé votre ordinateur »* → clique *Informations complémentaires* → *Exécuter quand même*. Chaque release est compilée **en toute transparence depuis le code source de ce dépôt** par GitHub Actions, avec le hash SHA256 publié à côté (`SHA256SUMS.txt`). En cas de doute, audite le code et compile-le toi-même (Option C).
+
+### Option B — depuis les sources
+
 ```
 git clone https://github.com/YOUR_USER/goxlr-streamlabs-sync.git
 cd goxlr-streamlabs-sync
 ```
 
-(ou télécharge le ZIP depuis GitHub et décompresse-le — rien à compiler, pas de `npm install`)
+Nécessite [Node.js 22+](https://nodejs.org/). Rien à compiler, pas de `npm install`.
+
+### Option C — compiler l'exe toi-même
+
+```
+npm install
+npm run build:exe        ->  build/goxlr-streamlabs-sync.exe
+```
 
 ## Mise en place
 
@@ -90,13 +106,17 @@ node src/index.js --list
 
 ### 3. Lancer
 
-**Recommandé (aucune fenêtre) :** double-clique sur **`start-hidden.vbs`** — la sync tourne silencieusement en arrière-plan et le dashboard s'ouvre dans ton navigateur. Re-double-cliquer rouvre juste le dashboard (instance unique). Pour arrêter : `stop.bat` ou le bouton *Quitter* du dashboard.
+Une **icône apparaît dans la zone de notification** : clic droit pour *Ouvrir le dashboard* / *Quitter*, double-clic pour ouvrir le dashboard.
 
-**Avec une console :** double-clique sur `start.bat`, ou `npm start`.
+- **Exe autonome :** lance simplement `goxlr-streamlabs-sync.exe`. Pour zéro fenêtre console, ajoute le flag `--hidden` (dans un raccourci : `goxlr-streamlabs-sync.exe --hidden`).
+- **Depuis les sources, sans fenêtre :** double-clique sur **`start-hidden.vbs`**.
+- **Depuis les sources, avec console :** `start.bat` ou `npm start`.
+
+Relancer alors que c'est déjà lancé rouvre simplement le dashboard (instance unique). Pour arrêter : l'icône de notification, le bouton *Quitter* du dashboard, ou `stop.bat`.
 
 Bouge un fader sur le GoXLR — le slider Streamlabs correspondant suit. 🎚️
 
-Pour le lancer automatiquement avec Windows : `Win+R`, tape `shell:startup`, et dépose un raccourci vers `start-hidden.vbs` dans ce dossier.
+Pour le lancer automatiquement avec Windows : `Win+R`, tape `shell:startup`, et dépose un raccourci dans ce dossier (vers l'exe avec `--hidden`, ou vers `start-hidden.vbs`).
 
 ### Le dashboard
 
@@ -132,6 +152,7 @@ Avec un token configuré, `auto` essaie le pipe puis bascule tout seul sur le we
 | `ui.host` | `127.0.0.1` | Adresse d'écoute du dashboard (`0.0.0.0` pour l'accès LAN) |
 | `ui.port` | `14571` | Port du dashboard (sert aussi de verrou d'instance unique) |
 | `ui.openBrowser` | `false` | Ouvre le dashboard au démarrage (le flag `--open` fait pareil) |
+| `ui.tray` | `true` | Affiche l'icône dans la zone de notification (Windows) |
 
 ### Modes de mute
 

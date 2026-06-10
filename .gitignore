@@ -1,5 +1,7 @@
 node_modules/
+build/
 config.json
+config-ws-test.json
 *.log
 daemon-status.json
 .DS_Store

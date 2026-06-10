@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Smoke test (module graph + CLI)
+        run: |
+          node src/index.js --help
+          node src/index.js --version
+      - name: Build the standalone exe
+        run: |
+          npm ci
+          npm run build:exe

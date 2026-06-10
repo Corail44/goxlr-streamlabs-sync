@@ -21,7 +21,8 @@ Similar tools exist for OBS Studio ([goxlr-obs-fader-sync](https://github.com/Fr
 - Any GoXLR channel can be mapped to any number of Streamlabs sources
 - Works with the GoXLR Full and GoXLR Mini, and with multiple devices
 - Zero npm dependencies, single small Node.js process, auto-reconnects to both ends
-- Local web dashboard (live volumes, mute states, logs) + windowless launcher — nothing cluttering your taskbar
+- Local web dashboard (live volumes, mute states, logs) and a **system tray icon** — nothing cluttering your taskbar
+- **Standalone `.exe`** available (no Node.js install needed), built transparently by GitHub Actions
 - `--list` mode to discover your channels and exact source names
 - `--dry-run` mode to test safely
 
@@ -33,12 +34,27 @@ Similar tools exist for OBS Studio ([goxlr-obs-fader-sync](https://github.com/Fr
 
 ## Installation
 
+### Option A — standalone executable (easiest)
+
+Download `goxlr-streamlabs-sync.exe` from the [Releases page](../../releases), put it in its own folder, and run it. On first run it creates a `config.json` next to the exe — edit the mappings, run it again, done. No Node.js required.
+
+> **About Windows SmartScreen:** the exe is not code-signed (certificates cost money for a free community tool), so the first launch may show *"Windows protected your PC"* → click *More info* → *Run anyway*. Every release is built **transparently from this repository's source** by GitHub Actions, and the SHA256 checksum is published next to it (`SHA256SUMS.txt`). If in doubt, audit the code and build it yourself (Option C) — you'll get a byte-identical behavior.
+
+### Option B — run from source
+
 ```
 git clone https://github.com/YOUR_USER/goxlr-streamlabs-sync.git
 cd goxlr-streamlabs-sync
 ```
 
-(or download the ZIP from GitHub and extract it — there is nothing to build and no `npm install` needed)
+Requires [Node.js 22+](https://nodejs.org/). There is nothing to build and no `npm install` needed.
+
+### Option C — build the exe yourself
+
+```
+npm install
+npm run build:exe        ->  build/goxlr-streamlabs-sync.exe
+```
 
 ## Setup
 
@@ -90,13 +106,17 @@ It prints your GoXLR channels (with live volumes) and every Streamlabs audio sou
 
 ### 3. Run it
 
-**Recommended (no window):** double-click **`start-hidden.vbs`** — the sync runs silently in the background and the dashboard opens in your browser. Double-clicking it again just reopens the dashboard (single instance). Stop it with `stop.bat` or the dashboard's *Quit* button.
+A **tray icon** appears in the notification area: right-click for *Open dashboard* / *Quit*, double-click to open the dashboard.
 
-**With a console:** double-click `start.bat`, or run `npm start`.
+- **Standalone exe:** just run `goxlr-streamlabs-sync.exe`. For zero console window, add the `--hidden` flag (e.g. in a shortcut: `goxlr-streamlabs-sync.exe --hidden`).
+- **From source, no window:** double-click **`start-hidden.vbs`**.
+- **From source, with console:** `start.bat` or `npm start`.
+
+Launching it again while it's already running simply reopens the dashboard (single instance). Stop it from the tray icon, the dashboard's *Quit* button, or `stop.bat`.
 
 Move a fader on the GoXLR — the matching Streamlabs volume slider follows. 🎚️
 
-To launch it automatically with Windows: press `Win+R`, type `shell:startup`, and drop a shortcut to `start-hidden.vbs` there.
+To launch it automatically with Windows: press `Win+R`, type `shell:startup`, and drop a shortcut there (to the exe with `--hidden`, or to `start-hidden.vbs`).
 
 ### The dashboard
 
@@ -132,6 +152,7 @@ With a token configured, `auto` tries the pipe first and falls back to the webso
 | `ui.host` | `127.0.0.1` | Dashboard bind address (`0.0.0.0` to allow LAN access) |
 | `ui.port` | `14571` | Dashboard port (also used as the single-instance lock) |
 | `ui.openBrowser` | `false` | Open the dashboard on startup (the `--open` flag does the same) |
+| `ui.tray` | `true` | Show the system tray icon (Windows) |
 
 ### Mute modes
 
