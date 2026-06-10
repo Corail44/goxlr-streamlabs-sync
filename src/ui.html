@@ -15,8 +15,11 @@
   header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
   h1 { margin: 0; font-size: 16px; font-weight: 600; }
   h1 .v { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+  .hbtns { display: flex; gap: 8px; }
   #quit { background: transparent; color: var(--bad); border: 1px solid var(--bad); border-radius: 8px; padding: 6px 14px; cursor: pointer; font: inherit; }
   #quit:hover { background: var(--bad); color: #fff; }
+  #open-settings { background: transparent; color: var(--ok); border: 1px solid var(--accent); border-radius: 8px; padding: 6px 14px; cursor: pointer; font: inherit; font-weight: 600; }
+  #open-settings:hover { background: var(--accent); color: #fff; }
   #update { display: none; margin: 14px 18px 0; padding: 10px 14px; border-radius: 10px; background: #14301f; border: 1px solid var(--accent); }
   #update a { color: var(--ok); font-weight: 600; }
   .chips { display: flex; gap: 10px; flex-wrap: wrap; padding: 14px 18px 0; }
@@ -39,8 +42,13 @@
   .src { margin-top: 10px; font-size: 12px; color: var(--muted); }
   .src .bad { color: var(--bad); text-decoration: line-through; }
   details { margin: 4px 18px 18px; }
-  summary { cursor: pointer; color: var(--muted); user-select: none; font-weight: 600; }
-  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-top: 8px; }
+  summary { cursor: pointer; user-select: none; font-weight: 600; color: var(--text);
+            background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+            padding: 10px 14px; transition: border-color .15s; }
+  summary:hover { border-color: var(--accent); }
+  details[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-top: none;
+           border-radius: 0 0 12px 12px; padding: 14px 16px; }
   .set-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
   .set-row label { min-width: 180px; color: var(--muted); }
   select, input[type=text] { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font: inherit; }
@@ -56,7 +64,7 @@
   .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); font-weight: 400; }
   #save-status { margin-left: 10px; font-size: 13px; }
   .small { color: var(--muted); font-size: 12px; margin-top: 10px; word-break: break-all; }
-  #logs { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-top: 8px;
+  #logs { background: var(--panel2); border: 1px solid var(--border); border-top: none; border-radius: 0 0 10px 10px; padding: 10px 12px;
           max-height: 320px; overflow-y: auto; font: 12px/1.5 Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
   .lg-info { color: #9fb6c9; } .lg-ok { color: var(--ok); } .lg-warn { color: var(--warn); } .lg-error { color: var(--bad); } .lg-debug { color: #5d7286; }
   footer { padding: 0 18px 18px; color: var(--muted); font-size: 12px; }
@@ -68,7 +76,10 @@
 <body>
 <header>
   <h1>🎚️ goxlr-streamlabs-sync<span class="v">v__VERSION__</span></h1>
-  <button id="quit"></button>
+  <div class="hbtns">
+    <button id="open-settings"></button>
+    <button id="quit"></button>
+  </div>
 </header>
 <div id="update"></div>
 <div class="chips">
@@ -345,6 +356,13 @@
     $('#overlay-msg').textContent = msg;
     $('#overlay').classList.add('show');
   }
+
+  $('#open-settings').textContent = '⚙️ ' + T.settings;
+  $('#open-settings').addEventListener('click', () => {
+    const d = $('#settings-wrap');
+    d.open = true;
+    d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 
   $('#quit').addEventListener('click', () => {
     if (!confirm(T.confirmQuit)) return;
